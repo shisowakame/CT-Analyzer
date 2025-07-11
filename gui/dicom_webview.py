@@ -14,13 +14,13 @@ HTML_TEMPLATE = '''
     <meta charset="UTF-8">
     <title>DICOM Web Viewer (Multi-Series)</title>
     <style>
-        body { font-family: sans-serif; margin: 20px; }
-        #grid { display: grid; grid-template-columns: repeat({col_num}, 1fr); gap: 10px; max-width: 95vw; }
-        .series-block { display: flex; flex-direction: column; align-items: center; }
-        .dicom-img { max-width: 45vw; max-height: 40vh; border: 1px solid #888; }
-        .slider { width: 25vw; }
-        #global-slider-block { margin-top: 20px; text-align: center; }
-        #global-slider { width: 50vw; }
+        body {{ font-family: sans-serif; margin: 20px; }}
+        #grid {{ display: grid; grid-template-columns: repeat({col_num}, 1fr); gap: 10px; max-width: 95vw; }}
+        .series-block {{ display: flex; flex-direction: column; align-items: center; }}
+        .dicom-img {{ max-width: 45vw; max-height: 40vh; border: 1px solid #888; }}
+        .slider {{ width: 25vw; }}
+        #global-slider-block {{ margin-top: 20px; text-align: center; }}
+        #global-slider {{ width: 50vw; }}
     </style>
 </head>
 <body>
@@ -37,35 +37,35 @@ HTML_TEMPLATE = '''
         const seriesMaxIdxList = {series_max_idx_list};
         let currentSlices = Array(seriesCount).fill(0);
         const imgs = [], sliders = [], labels = [];
-        for (let i = 0; i < seriesCount; i++) {
+        for (let i = 0; i < seriesCount; i++) {{
             imgs.push(document.getElementById('dicom-img-' + i));
             sliders.push(document.getElementById('slider-' + i));
             labels.push(document.getElementById('slice-label-' + i));
-        }
-        for (let i = 0; i < seriesCount; i++) {
-            sliders[i].addEventListener('input', async function() {
+        }}
+        for (let i = 0; i < seriesCount; i++) {{
+            sliders[i].addEventListener('input', async function() {{
                 const idx = sliders[i].value;
                 currentSlices[i] = parseInt(idx);
-                labels[i].textContent = `Slice: ${idx}/${seriesMaxIdxList[i]}`;
+                labels[i].textContent = `Slice: ${{idx}}/${{seriesMaxIdxList[i]}}`;
                 const b64 = await window.pywebview.api.get_single_slice(i, idx);
                 imgs[i].src = 'data:image/png;base64,' + b64;
-            });
-        }
+            }});
+        }}
         const globalSlider = document.getElementById('global-slider');
         const globalLabel = document.getElementById('global-slice-label');
-        globalSlider.addEventListener('input', async function() {
+        globalSlider.addEventListener('input', async function() {{
             const idx = globalSlider.value;
-            globalLabel.textContent = `Slice: ${idx}/${globalSlider.max}`;
-            for (let i = 0; i < seriesCount; i++) {
+            globalLabel.textContent = `Slice: ${{idx}}/${{globalSlider.max}}`;
+            for (let i = 0; i < seriesCount; i++) {{
                 currentSlices[i] = parseInt(idx);
                 sliders[i].value = idx;
-                labels[i].textContent = `Slice: ${idx}/${seriesMaxIdxList[i]}`;
-            }
+                labels[i].textContent = `Slice: ${{idx}}/${{seriesMaxIdxList[i]}}`;
+            }}
             const b64list = await window.pywebview.api.get_slice(idx);
-            for (let i = 0; i < seriesCount; i++) {
+            for (let i = 0; i < seriesCount; i++) {{
                 imgs[i].src = 'data:image/png;base64,' + b64list[i];
-            }
-        });
+            }}
+        }});
     </script>
 </body>
 </html>
