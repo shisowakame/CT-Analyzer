@@ -43,6 +43,7 @@ HTML_TEMPLATE = '''
             </div>
         </div>
         <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">ROIリセット</button>
+        <button id="show-history-btn" style="border: none; background: #607d8b; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">履歴表示</button>
         <label>ROIサイズ:</label>
         <input type="number" id="roi-width" min="3" max="200" value="10"> ×
         <input type="number" id="roi-height" min="3" max="200" value="10">
@@ -60,6 +61,7 @@ HTML_TEMPLATE = '''
         <input type="range" id="global-slider" min="0" max="{global_max_idx}" value="0" />
         <span id="global-slice-label">Slice: 0/{global_max_idx}</span>
     </div>
+{history_popup}
     <script>
         const seriesCount = {series_count};
         const seriesMaxIdxList = {series_max_idx_list};
@@ -372,6 +374,105 @@ HTML_TEMPLATE = '''
                 imgs[i].src = 'data:image/png;base64,' + b64list[i];
             }}
         }});
+
+        // 履歴機能
+        let historyData = [];
+        const showHistoryBtn = document.getElementById('show-history-btn');
+        const historyPopup = document.getElementById('history-popup');
+        const historyContent = document.getElementById('history-content');
+        const closeHistoryBtn = document.getElementById('close-history-btn');
+        const saveHistoryBtn = document.getElementById('save-history-btn');
+        const resetHistoryBtn = document.getElementById('reset-history-btn');
+        const historyTableBlock = document.getElementById('history-table-block');
+        
+        showHistoryBtn.addEventListener('click', function() {{
+          historyPopup.style.display = 'flex';
+          renderHistoryTable();
+        }});
+        
+        closeHistoryBtn.addEventListener('click', function() {{
+          historyPopup.style.display = 'none';
+        }});
+        
+        historyPopup.addEventListener('click', function(e) {{
+          if (e.target === historyPopup) historyPopup.style.display = 'none';
+        }});
+        
+        function getCurrentStats() {{
+          let row = [];
+          for (let i = 0; i < seriesCount; i++) {{
+            let mean = '';
+            let std = '';
+            if (roiCoords[i]) {{
+              const info = infoPanels[i].innerText;
+              const m = info.match(/平均: ([\d\.-]+)/);
+              const s = info.match(/標準偏差: ([\d\.-]+)/);
+              mean = m ? m[1] : '';
+              std = s ? s[1] : '';
+            }}
+            row.push({{mean, std}});
+          }}
+          return row;
+        }}
+        
+        function renderHistoryTable() {{
+          let html = '<table style="font-size:11px; border-collapse:collapse; width:100%; min-width:400px;">';
+          html += '<tr>';
+          for (let i = 0; i < seriesCount; i++) {{
+            html += `<th colspan="2" style="border-bottom:1px solid #bbb; padding:2px 4px;">${{document.querySelector(`[onclick="showFolderSelector(${{i}})"]`)?.textContent.replace(' ▼','') || 'Series ' + i}}</th>`;
+          }}
+          html += '</tr>';
+          html += '<tr>';
+          for (let i = 0; i < seriesCount; i++) {{
+            html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px;">平均</th><th style="border-bottom:1px solid #bbb; padding:2px 4px;">標準偏差</th>';
+          }}
+          html += '</tr>';
+          for (let r = 0; r < historyData.length; r++) {{
+            html += '<tr>';
+            for (let i = 0; i < seriesCount; i++) {{
+              html += `<td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:right;">${{historyData[r][i]?.mean || ''}}</td><td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:right;">${{historyData[r][i]?.std || ''}}</td>`;
+            }}
+            html += '</tr>';
+          }}
+          if (historyData.length > 0) {{
+            html += '<tr style="background:#f4f4f4;">';
+            for (let i = 0; i < seriesCount; i++) {{
+              let meanSum = 0, stdSum = 0, cnt = 0;
+              for (let r = 0; r < historyData.length; r++) {{
+                if (historyData[r][i]?.mean) {{ meanSum += parseFloat(historyData[r][i].mean); cnt++; }}
+              }}
+              for (let r = 0; r < historyData.length; r++) {{
+                if (historyData[r][i]?.std) {{ stdSum += parseFloat(historyData[r][i].std); }}
+              }}
+              html += `<td style="font-weight:bold; text-align:right;">${{cnt ? (meanSum/cnt).toFixed(4) : ''}}</td><td style="font-weight:bold; text-align:right;">${{cnt ? (stdSum/cnt).toFixed(4) : ''}}</td>`;
+            }}
+            html += '</tr>';
+          }}
+          html += '</table>';
+          historyTableBlock.innerHTML = html;
+        }}
+        
+        saveHistoryBtn.addEventListener('click', function() {{
+          const row = getCurrentStats();
+          historyData.push(row);
+          renderHistoryTable();
+        }});
+        
+        resetHistoryBtn.addEventListener('click', function() {{
+          historyData = [];
+          renderHistoryTable();
+        }});
+        
+        window.addEventListener('keydown', function(e) {{
+          if ((e.ctrlKey || e.metaKey) && e.key === 's') {{
+            if (historyPopup.style.display === 'flex') {{
+              e.preventDefault();
+              const row = getCurrentStats();
+              historyData.push(row);
+              renderHistoryTable();
+            }}
+          }}
+        }});
     </script>
 </body>
 </html>
@@ -499,13 +600,33 @@ class DicomWebApi:
             for i, b64 in enumerate(b64list)
         ])
         col_num = min(self.series_count, 4) if self.series_count > 1 else 1
-        return HTML_TEMPLATE.format(
+        
+        # 履歴ポップアップHTML
+        history_popup_html = '''
+    <div id="history-popup" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.25); z-index:2000; align-items:center; justify-content:center;">
+      <div id="history-content" style="background:white; border-radius:8px; padding:24px 18px 18px 18px; min-width:480px; min-height:200px; max-width:90vw; max-height:80vh; overflow:auto; box-shadow:0 4px 24px rgba(0,0,0,0.18); position:relative;">
+        <button id="close-history-btn" style="position:absolute; top:8px; right:8px; background:#eee; border:none; border-radius:4px; font-size:14px; cursor:pointer;">×</button>
+        <h3 style="font-size:14px; margin:0 0 8px 0;">ROI統計履歴</h3>
+        <div id="history-table-block"></div>
+        <div style="margin-top:10px; display:flex; gap:8px;">
+          <button id="save-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#2196f3; color:white; cursor:pointer;">保存</button>
+          <button id="reset-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#f44336; color:white; cursor:pointer;">リセット</button>
+        </div>
+        <div style="font-size:11px; color:#888; margin-top:6px;">Ctrl+Sでも保存できます</div>
+      </div>
+    </div>'''
+        
+        # HTMLテンプレートに履歴ポップアップを動的に挿入
+        html_content = HTML_TEMPLATE.format(
             series_blocks=series_blocks,
             global_max_idx=self.global_max_idx,
             series_count=self.series_count,
             series_max_idx_list=self.series_max_idx_list,
-            col_num=col_num
+            col_num=col_num,
+            history_popup=history_popup_html
         )
+        
+        return html_content
 
     def get_slice(self, idx):
         idx = int(idx)
