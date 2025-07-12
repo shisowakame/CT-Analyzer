@@ -63,13 +63,14 @@ HTML_TEMPLATE = '''
         const seriesCount = {series_count};
         const seriesMaxIdxList = {series_max_idx_list};
         let currentSlices = Array(seriesCount).fill(0);
-        const imgs = [], sliders = [], labels = [], canvases = [], infoPanels = [];
+        const imgs = [], sliders = [], labels = [], canvases = [], infoPanels = [], filenames = [];
         for (let i = 0; i < seriesCount; i++) {{
             imgs.push(document.getElementById('dicom-img-' + i));
             sliders.push(document.getElementById('slider-' + i));
             labels.push(document.getElementById('slice-label-' + i));
             canvases.push(document.getElementById('roi-canvas-' + i));
             infoPanels.push(document.getElementById('info-panel-' + i));
+            filenames.push(document.getElementById('filename-' + i));
         }}
         // ROIサイズ管理
         let roiW = 10, roiH = 10;
@@ -246,6 +247,8 @@ HTML_TEMPLATE = '''
                 const idx = sliders[i].value;
                 currentSlices[i] = parseInt(idx);
                 labels[i].textContent = `Slice: ${{idx}}/${{seriesMaxIdxList[i]}}`;
+                const filename = await window.pywebview.api.get_filename(i, idx);
+                filenames[i].textContent = filename;
                 const b64 = await window.pywebview.api.get_single_slice(i, idx);
                 imgs[i].src = 'data:image/png;base64,' + b64;
                 // 画像切り替え後にcanvasリサイズ・ROI再描画・統計更新
@@ -271,6 +274,8 @@ HTML_TEMPLATE = '''
                 currentSlices[i] = parseInt(idx);
                 sliders[i].value = idx;
                 labels[i].textContent = `Slice: ${{idx}}/${{seriesMaxIdxList[i]}}`;
+                const filename = await window.pywebview.api.get_filename(i, idx);
+                filenames[i].textContent = filename;
                 const img = imgs[i];
                 const canvas = canvases[i];
                 img.onload = function() {{
@@ -295,7 +300,7 @@ HTML_TEMPLATE = '''
 class DicomWebApi:
     def __init__(self, dicom_folders):
         self.dicom_folders = dicom_folders
-        self.images_list, self.original_images_list = self.load_all_folders(dicom_folders)
+        self.images_list, self.original_images_list, self.file_names_list = self.load_all_folders(dicom_folders)
         self.series_count = len(self.images_list)
         self.series_max_idx_list = [len(images) - 1 for images in self.images_list]
         self.global_max_idx = min(self.series_max_idx_list) if self.series_count > 0 else 0
@@ -303,6 +308,7 @@ class DicomWebApi:
     def load_all_folders(self, folders):
         all_images = []
         all_original_images = []
+        all_file_names = []
         for folder in folders:
             dicom_files = glob.glob(os.path.join(folder, '*.dcm'))
             # DICOMファイルをImagePositionPatient[2]でソート
@@ -314,6 +320,7 @@ class DicomWebApi:
                 dicom_files.sort()
             images = []
             original_images = []
+            file_names = []
             for f in dicom_files:
                 try:
                     ds = pydicom.dcmread(f, force=True)
@@ -324,11 +331,14 @@ class DicomWebApi:
                     # 表示用に正規化
                     arr = self.normalize(arr)
                     images.append(arr)
+                    # ファイル名を保存
+                    file_names.append(os.path.basename(f))
                 except Exception as e:
                     print(f"読み込み失敗: {f} {e}")
             all_images.append(images)
             all_original_images.append(original_images)
-        return all_images, all_original_images
+            all_file_names.append(file_names)
+        return all_images, all_original_images, all_file_names
 
     def normalize(self, arr):
         arr = arr.astype(np.float32)
@@ -355,7 +365,7 @@ class DicomWebApi:
             f'<canvas class="roi-canvas" id="roi-canvas-{i}" width="{img_shapes[i][1]}" height="{img_shapes[i][0]}" style="position:absolute; left:0; top:0; z-index:2; pointer-events:auto;"></canvas>'
             f'<div class="info-panel" id="info-panel-{i}"></div>'
             f'<input type="range" class="slider" id="slider-{i}" min="0" max="{self.series_max_idx_list[i]}" value="0" />'
-            f'<span id="slice-label-{i}">Slice: 0/{self.series_max_idx_list[i]}</span>'
+            f'<div style="display: flex; gap: 5px; margin-top: 5px;"><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="slice-label-{i}" style="font-weight: bold;">Slice: 0/{self.series_max_idx_list[i]}</span></div><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="filename-{i}">{self.file_names_list[i][0] if len(self.file_names_list[i]) > 0 else ""}</span></div></div>'
             f'</div>'
             for i, b64 in enumerate(b64list)
         ])
@@ -404,6 +414,14 @@ class DicomWebApi:
         mean = float(np.mean(roi_flat)) if roi_flat.size > 0 else 0.0
         std = float(np.std(roi_flat)) if roi_flat.size > 0 else 0.0
         return {'mean': round(mean, 8), 'std': round(std, 8)}
+
+    # Python側API: ファイル名取得
+    def get_filename(self, series_idx, slice_idx):
+        series_idx = int(series_idx)
+        slice_idx = int(slice_idx)
+        if series_idx < len(self.file_names_list) and slice_idx < len(self.file_names_list[series_idx]):
+            return self.file_names_list[series_idx][slice_idx]
+        return ""
 
 if __name__ == '__main__':
     import sys
