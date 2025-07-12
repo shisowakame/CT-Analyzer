@@ -200,8 +200,7 @@ HTML_TEMPLATE = '''
                 const filename = await window.pywebview.api.get_filename(seriesIdx, 0);
                 filenames[seriesIdx].textContent = filename;
                 
-                // ROIをクリア
-                roiCoords[seriesIdx] = null;
+                // ROIはリセットしない（保持）
                 drawROI(seriesIdx);
                 updateStats(seriesIdx);
                 
