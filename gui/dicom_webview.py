@@ -35,7 +35,13 @@ HTML_TEMPLATE = '''
 </head>
 <body>
     <div id="toolbar">
-        <button id="mode-btn">同期モード</button>
+        <div style="display: flex; align-items: center; gap: 8px;">
+            <span>モード:</span>
+            <div style="display: flex; align-items: center; background: #e0e0e0; border-radius: 20px; padding: 2px; position: relative;">
+                <button id="sync-mode-btn" style="border: none; background: #4CAF50; color: white; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">同期モード</button>
+                <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">独立モード</button>
+            </div>
+        </div>
         <label>ROIサイズ:</label>
         <input type="number" id="roi-width" min="3" max="200" value="10"> ×
         <input type="number" id="roi-height" min="3" max="200" value="10">
@@ -92,11 +98,31 @@ HTML_TEMPLATE = '''
         // モード管理
         let syncMode = true;
         let roiCoords = Array(seriesCount).fill(null); // [{{x: x, y: y}}] or null
-        document.getElementById('mode-btn').addEventListener('click', function() {{
+        
+        function updateModeButtons() {{
+            const syncBtn = document.getElementById('sync-mode-btn');
+            const indepBtn = document.getElementById('indep-mode-btn');
+            if (syncMode) {{
+                syncBtn.style.background = '#4CAF50';
+                syncBtn.style.color = 'white';
+                indepBtn.style.background = 'transparent';
+                indepBtn.style.color = '#666';
+            }} else {{
+                syncBtn.style.background = 'transparent';
+                syncBtn.style.color = '#666';
+                indepBtn.style.background = '#4CAF50';
+                indepBtn.style.color = 'white';
+            }}
+        }}
+        
+        function switchMode(newMode) {{
+            if (syncMode === newMode) return;
+            
             // モード切替時の座標保持オプション
             let keep = confirm('モード切替時にROI座標を保持しますか？（OK:保持/キャンセル:リセット）');
-            syncMode = !syncMode;
-            this.textContent = syncMode ? '同期モード' : '独立モード';
+            syncMode = newMode;
+            updateModeButtons();
+            
             if (!keep) {{
                 roiCoords = Array(seriesCount).fill(null);
                 redrawAllROIs();
@@ -107,7 +133,18 @@ HTML_TEMPLATE = '''
                     redrawAllROIs();
                 }}
             }}
+        }}
+        
+        document.getElementById('sync-mode-btn').addEventListener('click', function() {{
+            switchMode(true);
         }});
+        
+        document.getElementById('indep-mode-btn').addEventListener('click', function() {{
+            switchMode(false);
+        }});
+        
+        // 初期状態の設定
+        updateModeButtons();
         // ROI描画・操作
         function redrawAllROIs() {{
             for (let i = 0; i < seriesCount; i++) drawROI(i);
