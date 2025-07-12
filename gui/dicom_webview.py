@@ -294,6 +294,7 @@ HTML_TEMPLATE = '''
 
 class DicomWebApi:
     def __init__(self, dicom_folders):
+        self.dicom_folders = dicom_folders
         self.images_list, self.original_images_list = self.load_all_folders(dicom_folders)
         self.series_count = len(self.images_list)
         self.series_max_idx_list = [len(images) - 1 for images in self.images_list]
@@ -303,7 +304,14 @@ class DicomWebApi:
         all_images = []
         all_original_images = []
         for folder in folders:
-            dicom_files = sorted(glob.glob(os.path.join(folder, '*.dcm')))
+            dicom_files = glob.glob(os.path.join(folder, '*.dcm'))
+            # DICOMファイルをImagePositionPatient[2]でソート
+            try:
+                dicom_files.sort(key=lambda x: pydicom.dcmread(x, force=True).ImagePositionPatient[2])
+            except Exception as e:
+                print(f"DICOMソートエラー: {e}")
+                # ソートに失敗した場合はファイル名でソート
+                dicom_files.sort()
             images = []
             original_images = []
             for f in dicom_files:
@@ -338,8 +346,11 @@ class DicomWebApi:
         b64list = [self.get_png_b64(images[0]) for images in self.images_list]
         # 画像サイズ取得（最初の画像のshapeを使う）
         img_shapes = [images[0].shape if len(images) > 0 else (512, 512) for images in self.images_list]
+        # フォルダ名を取得
+        folder_names = [os.path.basename(folder) for folder in self.dicom_folders]
         series_blocks = '\n        '.join([
             f'<div class="series-block" style="position:relative;">'
+            f'<div style="margin-bottom: 8px; font-weight: bold;">{folder_names[i]}</div>'
             f'<img class="dicom-img" id="dicom-img-{i}" src="data:image/png;base64,{b64}" width="{img_shapes[i][1]}" height="{img_shapes[i][0]}" style="display:block; position:relative; z-index:1;" />'
             f'<canvas class="roi-canvas" id="roi-canvas-{i}" width="{img_shapes[i][1]}" height="{img_shapes[i][0]}" style="position:absolute; left:0; top:0; z-index:2; pointer-events:auto;"></canvas>'
             f'<div class="info-panel" id="info-panel-{i}"></div>'
