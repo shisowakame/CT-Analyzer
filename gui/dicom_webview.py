@@ -198,7 +198,7 @@ HTML_TEMPLATE = '''
             const x = roiCoords[idx].x, y = roiCoords[idx].y;
             const stats = await window.pywebview.api.get_roi_stats(idx, currentSlices[idx], x, y, roiW, roiH);
             const img = imgs[idx];
-            infoPanels[idx].textContent = `画像サイズ: ${{img.naturalWidth}}x${{img.naturalHeight}}\nROI: [${{x}},${{y}}] ${{roiW}}x${{roiH}}\n平均: ${{stats.mean}} 標準偏差: ${{stats.std}}`;
+            infoPanels[idx].innerHTML = `画像サイズ: ${{img.naturalWidth}}x${{img.naturalHeight}}<br>ROI: [${{x}},${{y}}] ${{roiW}}x${{roiH}}<br>平均: ${{stats.mean}}<br>標準偏差: ${{stats.std}}`;
         }}
         function updateAllStats() {{
             for (let i = 0; i < seriesCount; i++) updateStats(i);
