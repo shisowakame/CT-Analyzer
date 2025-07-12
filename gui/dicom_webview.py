@@ -42,6 +42,7 @@ HTML_TEMPLATE = '''
                 <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">独立モード</button>
             </div>
         </div>
+        <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">ROIリセット</button>
         <label>ROIサイズ:</label>
         <input type="number" id="roi-width" min="3" max="200" value="10"> ×
         <input type="number" id="roi-height" min="3" max="200" value="10">
@@ -119,15 +120,10 @@ HTML_TEMPLATE = '''
         function switchMode(newMode) {{
             if (syncMode === newMode) return;
             
-            // モード切替時の座標保持オプション
-            let keep = confirm('モード切替時にROI座標を保持しますか？（OK:保持/キャンセル:リセット）');
             syncMode = newMode;
             updateModeButtons();
             
-            if (!keep) {{
-                roiCoords = Array(seriesCount).fill(null);
-                redrawAllROIs();
-            }} else if (syncMode) {{
+            if (syncMode) {{
                 // 独立→同期: 先頭画像のROIを全画像にコピー
                 if (roiCoords[0]) {{
                     for (let i = 1; i < seriesCount; i++) roiCoords[i] = {{x: roiCoords[0].x, y: roiCoords[0].y}};
@@ -142,6 +138,16 @@ HTML_TEMPLATE = '''
         
         document.getElementById('indep-mode-btn').addEventListener('click', function() {{
             switchMode(false);
+        }});
+        
+        // ROIリセットボタン
+        document.getElementById('reset-roi-btn').addEventListener('click', function() {{
+            roiCoords = Array(seriesCount).fill(null);
+            redrawAllROIs();
+            // 統計情報もクリア
+            for (let i = 0; i < seriesCount; i++) {{
+                infoPanels[i].innerHTML = '';
+            }}
         }});
         
         // 初期状態の設定
