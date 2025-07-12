@@ -146,6 +146,81 @@ HTML_TEMPLATE = '''
         
         // 初期状態の設定
         updateModeButtons();
+        
+        // フォルダ選択機能
+        async function showFolderSelector(seriesIdx) {{
+            // フォルダ2の場合のみ選択機能を有効にする
+            const folderType = await window.pywebview.api.get_folder_type(seriesIdx);
+            if (folderType !== 'folder2') return;
+            
+            const selector = document.getElementById('folder-selector-' + seriesIdx);
+            if (selector.style.display === 'none') {{
+                // 他のセレクターを閉じる
+                for (let i = 0; i < seriesCount; i++) {{
+                    const otherSelector = document.getElementById('folder-selector-' + i);
+                    if (otherSelector) otherSelector.style.display = 'none';
+                }}
+                // フォルダリストを表示
+                const folderList = await window.pywebview.api.get_folder_list(seriesIdx);
+                selector.innerHTML = '';
+                folderList.forEach((folder, idx) => {{
+                    const div = document.createElement('div');
+                    div.textContent = folder;
+                    div.style.padding = '4px 8px';
+                    div.style.cursor = 'pointer';
+                    div.style.borderBottom = '1px solid #eee';
+                    div.onmouseover = function() {{ this.style.backgroundColor = '#f0f0f0'; }};
+                    div.onmouseout = function() {{ this.style.backgroundColor = 'white'; }};
+                    div.onclick = function() {{ 
+                        selectFolder(seriesIdx, idx);
+                        selector.style.display = 'none';
+                    }};
+                    selector.appendChild(div);
+                }});
+                selector.style.display = 'block';
+            }} else {{
+                selector.style.display = 'none';
+            }}
+        }}
+        
+        async function selectFolder(seriesIdx, folderIdx) {{
+            const result = await window.pywebview.api.switch_folder(seriesIdx, folderIdx);
+            if (result.success) {{
+                // 画像を更新
+                const b64 = await window.pywebview.api.get_single_slice(seriesIdx, 0);
+                imgs[seriesIdx].src = 'data:image/png;base64,' + b64;
+                
+                // スライダーをリセット
+                sliders[seriesIdx].value = 0;
+                sliders[seriesIdx].max = result.max_idx;
+                currentSlices[seriesIdx] = 0;
+                labels[seriesIdx].textContent = `Slice: 0/${{result.max_idx}}`;
+                
+                // ファイル名を更新
+                const filename = await window.pywebview.api.get_filename(seriesIdx, 0);
+                filenames[seriesIdx].textContent = filename;
+                
+                // ROIをクリア
+                roiCoords[seriesIdx] = null;
+                drawROI(seriesIdx);
+                updateStats(seriesIdx);
+                
+                // フォルダ名を更新
+                const folderName = await window.pywebview.api.get_current_folder_name(seriesIdx);
+                const folderElement = document.querySelector(`[onclick="showFolderSelector(${{seriesIdx}})"]`);
+                folderElement.textContent = folderName + ' ▼';
+            }}
+        }}
+        
+        // クリック以外でセレクターを閉じる
+        document.addEventListener('click', function(e) {{
+            if (!e.target.closest('.series-block')) {{
+                for (let i = 0; i < seriesCount; i++) {{
+                    document.getElementById('folder-selector-' + i).style.display = 'none';
+                }}
+            }}
+        }});
+        
         // ROI描画・操作
         function redrawAllROIs() {{
             for (let i = 0; i < seriesCount; i++) drawROI(i);
@@ -309,36 +384,70 @@ class DicomWebApi:
         all_images = []
         all_original_images = []
         all_file_names = []
+        all_subfolders = []
+        folder_types = []  # 'folder2' or 'folder1'
+        
         for folder in folders:
-            dicom_files = glob.glob(os.path.join(folder, '*.dcm'))
-            # DICOMファイルをImagePositionPatient[2]でソート
-            try:
-                dicom_files.sort(key=lambda x: pydicom.dcmread(x, force=True).ImagePositionPatient[2])
-            except Exception as e:
-                print(f"DICOMソートエラー: {e}")
-                # ソートに失敗した場合はファイル名でソート
-                dicom_files.sort()
-            images = []
-            original_images = []
-            file_names = []
-            for f in dicom_files:
-                try:
-                    ds = pydicom.dcmread(f, force=True)
-                    arr = ds.pixel_array
-                    # 元データを保存（HU値）
-                    original_arr = arr.astype(np.float32) + ds.RescaleIntercept
-                    original_images.append(original_arr)
-                    # 表示用に正規化
-                    arr = self.normalize(arr)
-                    images.append(arr)
-                    # ファイル名を保存
-                    file_names.append(os.path.basename(f))
-                except Exception as e:
-                    print(f"読み込み失敗: {f} {e}")
+            # フォルダ2内のフォルダ1を検索
+            subfolders = []
+            for item in os.listdir(folder):
+                item_path = os.path.join(folder, item)
+                if os.path.isdir(item_path):
+                    # DICOMファイルが含まれているかチェック
+                    dicom_files = glob.glob(os.path.join(item_path, '*.dcm'))
+                    if dicom_files:
+                        subfolders.append(item_path)
+            
+            if len(subfolders) > 1:
+                # フォルダ2（複数のフォルダ1を含む）
+                folder_types.append('folder2')
+                all_subfolders.append(subfolders)
+                # 最初のフォルダ1を読み込み
+                current_subfolder = subfolders[0]
+            else:
+                # フォルダ1（直接指定または単一フォルダ）
+                folder_types.append('folder1')
+                all_subfolders.append([folder])
+                current_subfolder = folder
+            
+            images, original_images, file_names = self.load_single_folder(current_subfolder)
             all_images.append(images)
             all_original_images.append(original_images)
             all_file_names.append(file_names)
+        
+        self.all_subfolders = all_subfolders
+        self.folder_types = folder_types
         return all_images, all_original_images, all_file_names
+    
+    def load_single_folder(self, folder):
+        dicom_files = glob.glob(os.path.join(folder, '*.dcm'))
+        # DICOMファイルをImagePositionPatient[2]でソート
+        try:
+            dicom_files.sort(key=lambda x: pydicom.dcmread(x, force=True).ImagePositionPatient[2])
+        except Exception as e:
+            print(f"DICOMソートエラー: {e}")
+            # ソートに失敗した場合はファイル名でソート
+            dicom_files.sort()
+        
+        images = []
+        original_images = []
+        file_names = []
+        for f in dicom_files:
+            try:
+                ds = pydicom.dcmread(f, force=True)
+                arr = ds.pixel_array
+                # 元データを保存（HU値）
+                original_arr = arr.astype(np.float32) + ds.RescaleIntercept
+                original_images.append(original_arr)
+                # 表示用に正規化
+                arr = self.normalize(arr)
+                images.append(arr)
+                # ファイル名を保存
+                file_names.append(os.path.basename(f))
+            except Exception as e:
+                print(f"読み込み失敗: {f} {e}")
+        
+        return images, original_images, file_names
 
     def normalize(self, arr):
         arr = arr.astype(np.float32)
@@ -356,12 +465,27 @@ class DicomWebApi:
         b64list = [self.get_png_b64(images[0]) for images in self.images_list]
         # 画像サイズ取得（最初の画像のshapeを使う）
         img_shapes = [images[0].shape if len(images) > 0 else (512, 512) for images in self.images_list]
-        # フォルダ名を取得
-        folder_names = [os.path.basename(folder) for folder in self.dicom_folders]
+        # フォルダ名を取得（現在表示中のフォルダ1の名前）
+        folder_names = []
+        for i in range(len(self.dicom_folders)):
+            if i < len(self.all_subfolders) and self.all_subfolders[i]:
+                # 現在のフォルダ1を特定
+                current_first_file = self.file_names_list[i][0] if self.file_names_list[i] else ""
+                for folder in self.all_subfolders[i]:
+                    test_images, _, test_files = self.load_single_folder(folder)
+                    if test_files and test_files[0] == current_first_file:
+                        folder_names.append(os.path.basename(folder))
+                        break
+                else:
+                    folder_names.append(os.path.basename(self.dicom_folders[i]))
+            else:
+                folder_names.append(os.path.basename(self.dicom_folders[i]))
+        
         series_blocks = '\n        '.join([
             f'<div class="series-block" style="position:relative;">'
-            f'<div style="margin-bottom: 8px; font-weight: bold;">{folder_names[i]}</div>'
-            f'<img class="dicom-img" id="dicom-img-{i}" src="data:image/png;base64,{b64}" width="{img_shapes[i][1]}" height="{img_shapes[i][0]}" style="display:block; position:relative; z-index:1;" />'
+            + (f'<div style="margin-bottom: 8px; font-weight: bold; cursor: pointer; padding: 4px; border-radius: 4px; background: #f0f0f0;" onclick="showFolderSelector({i})">{folder_names[i]} ▼</div>'
+               f'<div id="folder-selector-{i}" style="display: none; position: absolute; top: 30px; left: 0; background: white; border: 1px solid #ccc; border-radius: 4px; padding: 8px; z-index: 1000; max-height: 200px; overflow-y: auto;"></div>' if self.folder_types[i] == 'folder2' else f'<div style="margin-bottom: 8px; font-weight: bold;">{folder_names[i]}</div>')
+            + f'<img class="dicom-img" id="dicom-img-{i}" src="data:image/png;base64,{b64}" width="{img_shapes[i][1]}" height="{img_shapes[i][0]}" style="display:block; position:relative; z-index:1;" />'
             f'<canvas class="roi-canvas" id="roi-canvas-{i}" width="{img_shapes[i][1]}" height="{img_shapes[i][0]}" style="position:absolute; left:0; top:0; z-index:2; pointer-events:auto;"></canvas>'
             f'<div class="info-panel" id="info-panel-{i}"></div>'
             f'<input type="range" class="slider" id="slider-{i}" min="0" max="{self.series_max_idx_list[i]}" value="0" />'
@@ -422,6 +546,55 @@ class DicomWebApi:
         if series_idx < len(self.file_names_list) and slice_idx < len(self.file_names_list[series_idx]):
             return self.file_names_list[series_idx][slice_idx]
         return ""
+    
+    # Python側API: フォルダリスト取得
+    def get_folder_list(self, series_idx):
+        series_idx = int(series_idx)
+        if series_idx < len(self.all_subfolders):
+            return [os.path.basename(folder) for folder in self.all_subfolders[series_idx]]
+        return []
+    
+    # Python側API: フォルダ切り替え
+    def switch_folder(self, series_idx, folder_idx):
+        series_idx = int(series_idx)
+        folder_idx = int(folder_idx)
+        
+        if series_idx < len(self.all_subfolders) and folder_idx < len(self.all_subfolders[series_idx]):
+            new_folder = self.all_subfolders[series_idx][folder_idx]
+            images, original_images, file_names = self.load_single_folder(new_folder)
+            
+            self.images_list[series_idx] = images
+            self.original_images_list[series_idx] = original_images
+            self.file_names_list[series_idx] = file_names
+            self.series_max_idx_list[series_idx] = len(images) - 1
+            
+            return {
+                'success': True,
+                'max_idx': len(images) - 1
+            }
+        return {'success': False}
+    
+    # Python側API: 現在のフォルダ名取得
+    def get_current_folder_name(self, series_idx):
+        series_idx = int(series_idx)
+        if series_idx < len(self.all_subfolders):
+            # 現在のフォルダを特定するために、最初のファイル名を比較
+            current_first_file = self.file_names_list[series_idx][0] if self.file_names_list[series_idx] else ""
+            for folder in self.all_subfolders[series_idx]:
+                test_images, _, test_files = self.load_single_folder(folder)
+                if test_files and test_files[0] == current_first_file:
+                    return os.path.basename(folder)
+            # 見つからない場合は最初のフォルダを返す
+            if self.all_subfolders[series_idx]:
+                return os.path.basename(self.all_subfolders[series_idx][0])
+        return "Unknown"
+    
+    # Python側API: フォルダタイプ取得
+    def get_folder_type(self, series_idx):
+        series_idx = int(series_idx)
+        if series_idx < len(self.folder_types):
+            return self.folder_types[series_idx]
+        return "folder1"
 
 if __name__ == '__main__':
     import sys
