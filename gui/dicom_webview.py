@@ -294,26 +294,33 @@ HTML_TEMPLATE = '''
 
 class DicomWebApi:
     def __init__(self, dicom_folders):
-        self.images_list = self.load_all_folders(dicom_folders)
+        self.images_list, self.original_images_list = self.load_all_folders(dicom_folders)
         self.series_count = len(self.images_list)
         self.series_max_idx_list = [len(images) - 1 for images in self.images_list]
         self.global_max_idx = min(self.series_max_idx_list) if self.series_count > 0 else 0
 
     def load_all_folders(self, folders):
         all_images = []
+        all_original_images = []
         for folder in folders:
             dicom_files = sorted(glob.glob(os.path.join(folder, '*.dcm')))
             images = []
+            original_images = []
             for f in dicom_files:
                 try:
                     ds = pydicom.dcmread(f, force=True)
                     arr = ds.pixel_array
+                    # 元データを保存（HU値）
+                    original_arr = arr.astype(np.float32) + ds.RescaleIntercept
+                    original_images.append(original_arr)
+                    # 表示用に正規化
                     arr = self.normalize(arr)
                     images.append(arr)
                 except Exception as e:
                     print(f"読み込み失敗: {f} {e}")
             all_images.append(images)
-        return all_images
+            all_original_images.append(original_images)
+        return all_images, all_original_images
 
     def normalize(self, arr):
         arr = arr.astype(np.float32)
@@ -379,10 +386,12 @@ class DicomWebApi:
         y = int(y)
         w = int(w)
         h = int(h)
-        arr = self.images_list[series_idx][slice_idx]
+        # 正規化前の元データ（HU値）を使用
+        arr = self.original_images_list[series_idx][slice_idx]
         roi = arr[y:y+h, x:x+w]
-        mean = float(np.mean(roi)) if roi.size > 0 else 0.0
-        std = float(np.std(roi)) if roi.size > 0 else 0.0
+        roi_flat = roi.flatten()  # 1次元配列に変換
+        mean = float(np.mean(roi_flat)) if roi_flat.size > 0 else 0.0
+        std = float(np.std(roi_flat)) if roi_flat.size > 0 else 0.0
         return {'mean': round(mean, 8), 'std': round(std, 8)}
 
 if __name__ == '__main__':
