@@ -385,17 +385,53 @@ HTML_TEMPLATE = '''
         const resetHistoryBtn = document.getElementById('reset-history-btn');
         const historyTableBlock = document.getElementById('history-table-block');
         
+        // ドラッグ機能の変数
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartY = 0;
+        let popupStartX = 0;
+        let popupStartY = 0;
+        
+        // ドラッグ開始
+        function startDrag(e) {{
+          isDragging = true;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          const rect = historyPopup.getBoundingClientRect();
+          popupStartX = rect.left;
+          popupStartY = rect.top;
+          document.addEventListener('mousemove', onDrag);
+          document.addEventListener('mouseup', stopDrag);
+          e.preventDefault();
+        }}
+        
+        // ドラッグ中
+        function onDrag(e) {{
+          if (!isDragging) return;
+          const deltaX = e.clientX - dragStartX;
+          const deltaY = e.clientY - dragStartY;
+          historyPopup.style.left = (popupStartX + deltaX) + 'px';
+          historyPopup.style.top = (popupStartY + deltaY) + 'px';
+        }}
+        
+        // ドラッグ終了
+        function stopDrag() {{
+          isDragging = false;
+          document.removeEventListener('mousemove', onDrag);
+          document.removeEventListener('mouseup', stopDrag);
+        }}
+        
+        // ヘッダーにドラッグイベントを追加
+        const historyHeader = document.getElementById('history-header');
+        historyHeader.addEventListener('mousedown', startDrag);
+        
         showHistoryBtn.addEventListener('click', function() {{
-          historyPopup.style.display = 'flex';
+          historyPopup.style.display = 'block';
           renderHistoryTable();
         }});
         
         closeHistoryBtn.addEventListener('click', function() {{
           historyPopup.style.display = 'none';
-        }});
-        
-        historyPopup.addEventListener('click', function(e) {{
-          if (e.target === historyPopup) historyPopup.style.display = 'none';
         }});
         
         function getCurrentStats() {{
@@ -487,7 +523,7 @@ HTML_TEMPLATE = '''
             e.preventDefault();
             const row = getCurrentStats();
             historyData.push(row);
-            if (historyPopup.style.display === 'flex') {{
+            if (historyPopup.style.display === 'block') {{
               renderHistoryTable();
             }}
           }}
@@ -620,18 +656,20 @@ class DicomWebApi:
         ])
         col_num = min(self.series_count, 4) if self.series_count > 1 else 1
         
-        # 履歴ポップアップHTML
+        # 履歴ポップアップHTML（ドラッグ可能な独立ウィンドウ）
         history_popup_html = '''
-    <div id="history-popup" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.25); z-index:2000; align-items:center; justify-content:center;">
-      <div id="history-content" style="background:white; border-radius:8px; padding:24px 18px 18px 18px; min-width:480px; min-height:200px; max-width:90vw; max-height:80vh; overflow:auto; box-shadow:0 4px 24px rgba(0,0,0,0.18); position:relative;">
-        <button id="close-history-btn" style="position:absolute; top:8px; right:8px; background:#eee; border:none; border-radius:4px; font-size:14px; cursor:pointer;">×</button>
-        <h3 style="font-size:14px; margin:0 0 8px 0;">ROI統計履歴</h3>
+    <div id="history-popup" style="display:none; position:fixed; top:50px; left:50px; width:600px; height:400px; background:white; border:2px solid #ccc; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.18); z-index:2000; overflow:hidden;">
+      <div id="history-header" style="background:#f5f5f5; padding:8px 12px; border-bottom:1px solid #ddd; cursor:move; user-select:none; display:flex; justify-content:space-between; align-items:center;">
+        <h3 style="font-size:14px; margin:0; color:#333;">ROI統計履歴</h3>
+        <button id="close-history-btn" style="background:#ff4444; color:white; border:none; border-radius:4px; font-size:12px; cursor:pointer; padding:2px 6px;">×</button>
+      </div>
+      <div id="history-content" style="padding:12px; height:calc(100% - 40px); overflow:auto;">
         <div id="history-table-block"></div>
-        <div style="margin-top:10px; display:flex; gap:8px;">
+        <div style="margin-top:10px; display:flex; gap:8px; position:absolute; bottom:12px; left:12px; right:12px;">
           <button id="save-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#2196f3; color:white; cursor:pointer;">保存</button>
           <button id="reset-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#f44336; color:white; cursor:pointer;">リセット</button>
         </div>
-        <div style="font-size:11px; color:#888; margin-top:6px;">Ctrl+Sでも保存できます</div>
+        <div style="font-size:11px; color:#888; margin-top:6px; position:absolute; bottom:12px; right:12px;">Ctrl+Sでも保存できます</div>
       </div>
     </div>'''
         
