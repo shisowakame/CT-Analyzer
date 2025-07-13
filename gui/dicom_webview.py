@@ -421,7 +421,7 @@ HTML_TEMPLATE = '''
           html += '<tr>';
           html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px; width:40px;">番号</th>';
           for (let i = 0; i < seriesCount; i++) {{
-            html += `<th colspan="2" style="border-bottom:1px solid #bbb; padding:2px 4px;">${{document.querySelector(`[onclick="showFolderSelector(${{i}})"]`)?.textContent.replace(' ▼','') || 'Series ' + i}}</th>`;
+            html += `<th colspan="2" style="border-bottom:1px solid #bbb; padding:2px 4px;">Folder${{i + 1}}</th>`;
           }}
           html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px; width:60px;">操作</th>';
           html += '</tr>';
