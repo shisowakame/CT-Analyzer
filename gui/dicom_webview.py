@@ -61,7 +61,6 @@ HTML_TEMPLATE = '''
         <input type="range" id="global-slider" min="0" max="{global_max_idx}" value="0" />
         <span id="global-slice-label">Slice: 1/{global_max_idx_plus1}</span>
     </div>
-{history_popup}
     <script>
         const seriesCount = {series_count};
         const seriesMaxIdxList = {series_max_idx_list};
@@ -378,135 +377,6 @@ HTML_TEMPLATE = '''
         // 履歴機能
         let historyData = [];
         const showHistoryBtn = document.getElementById('show-history-btn');
-        const historyPopup = document.getElementById('history-popup');
-        const historyContent = document.getElementById('history-content');
-        const closeHistoryBtn = document.getElementById('close-history-btn');
-        const saveHistoryBtn = document.getElementById('save-history-btn');
-        const resetHistoryBtn = document.getElementById('reset-history-btn');
-        const historyTableBlock = document.getElementById('history-table-block');
-        
-        // ドラッグ・リサイズ機能の変数
-        let isDragging = false;
-        let isResizing = false;
-        let resizeDirection = '';
-        let dragStartX = 0;
-        let dragStartY = 0;
-        let popupStartX = 0;
-        let popupStartY = 0;
-        let popupStartWidth = 0;
-        let popupStartHeight = 0;
-        
-        // ドラッグ開始
-        function startDrag(e) {{
-          isDragging = true;
-          dragStartX = e.clientX;
-          dragStartY = e.clientY;
-          const rect = historyPopup.getBoundingClientRect();
-          popupStartX = rect.left;
-          popupStartY = rect.top;
-          document.addEventListener('mousemove', onDrag);
-          document.addEventListener('mouseup', stopDrag);
-          e.preventDefault();
-        }}
-        
-        // リサイズ開始
-        function startResize(e, direction) {{
-          isResizing = true;
-          resizeDirection = direction;
-          dragStartX = e.clientX;
-          dragStartY = e.clientY;
-          const rect = historyPopup.getBoundingClientRect();
-          popupStartX = rect.left;
-          popupStartY = rect.top;
-          popupStartWidth = rect.width;
-          popupStartHeight = rect.height;
-          document.addEventListener('mousemove', onResize);
-          document.addEventListener('mouseup', stopResize);
-          e.preventDefault();
-        }}
-        
-        // ドラッグ中
-        function onDrag(e) {{
-          if (!isDragging) return;
-          const deltaX = e.clientX - dragStartX;
-          const deltaY = e.clientY - dragStartY;
-          historyPopup.style.left = (popupStartX + deltaX) + 'px';
-          historyPopup.style.top = (popupStartY + deltaY) + 'px';
-        }}
-        
-        // リサイズ中
-        function onResize(e) {{
-          if (!isResizing) return;
-          const deltaX = e.clientX - dragStartX;
-          const deltaY = e.clientY - dragStartY;
-          
-          let newLeft = popupStartX;
-          let newTop = popupStartY;
-          let newWidth = popupStartWidth;
-          let newHeight = popupStartHeight;
-          
-          if (resizeDirection.includes('w')) {{
-            newLeft = popupStartX + deltaX;
-            newWidth = popupStartWidth - deltaX;
-          }}
-          if (resizeDirection.includes('e')) {{
-            newWidth = popupStartWidth + deltaX;
-          }}
-          if (resizeDirection.includes('n')) {{
-            newTop = popupStartY + deltaY;
-            newHeight = popupStartHeight - deltaY;
-          }}
-          if (resizeDirection.includes('s')) {{
-            newHeight = popupStartHeight + deltaY;
-          }}
-          
-          // 最小サイズ制限
-          newWidth = Math.max(400, newWidth);
-          newHeight = Math.max(300, newHeight);
-          
-          historyPopup.style.left = newLeft + 'px';
-          historyPopup.style.top = newTop + 'px';
-          historyPopup.style.width = newWidth + 'px';
-          historyPopup.style.height = newHeight + 'px';
-        }}
-        
-        // ドラッグ終了
-        function stopDrag() {{
-          isDragging = false;
-          document.removeEventListener('mousemove', onDrag);
-          document.removeEventListener('mouseup', stopDrag);
-        }}
-        
-        // リサイズ終了
-        function stopResize() {{
-          isResizing = false;
-          resizeDirection = '';
-          document.removeEventListener('mousemove', onResize);
-          document.removeEventListener('mouseup', stopResize);
-        }}
-        
-        // ヘッダーにドラッグイベントを追加
-        const historyHeader = document.getElementById('history-header');
-        historyHeader.addEventListener('mousedown', startDrag);
-        
-        // 各リサイズハンドルにリサイズイベントを追加
-        document.getElementById('resize-n').addEventListener('mousedown', (e) => startResize(e, 'n'));
-        document.getElementById('resize-s').addEventListener('mousedown', (e) => startResize(e, 's'));
-        document.getElementById('resize-e').addEventListener('mousedown', (e) => startResize(e, 'e'));
-        document.getElementById('resize-w').addEventListener('mousedown', (e) => startResize(e, 'w'));
-        document.getElementById('resize-nw').addEventListener('mousedown', (e) => startResize(e, 'nw'));
-        document.getElementById('resize-ne').addEventListener('mousedown', (e) => startResize(e, 'ne'));
-        document.getElementById('resize-sw').addEventListener('mousedown', (e) => startResize(e, 'sw'));
-        document.getElementById('resize-se').addEventListener('mousedown', (e) => startResize(e, 'se'));
-        
-        showHistoryBtn.addEventListener('click', function() {{
-          historyPopup.style.display = 'block';
-          renderHistoryTable();
-        }});
-        
-        closeHistoryBtn.addEventListener('click', function() {{
-          historyPopup.style.display = 'none';
-        }});
         
         function getCurrentStats() {{
           let row = [];
@@ -525,83 +395,143 @@ HTML_TEMPLATE = '''
           return row;
         }}
         
-        function renderHistoryTable() {{
-          let html = '<table style="font-size:11px; border-collapse:collapse; width:100%; min-width:400px;">';
-          // ヘッダ行
-          html += '<tr>';
-          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px; width:40px;">番号</th>';
-          for (let i = 0; i < seriesCount; i++) {{
-            html += `<th colspan="2" style="border-bottom:1px solid #bbb; padding:2px 4px;">Folder${{i + 1}}</th>`;
-          }}
-          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px; width:60px;">操作</th>';
-          html += '</tr>';
-          // サブヘッダ行
-          html += '<tr>';
-          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px;"></th>';
-          for (let i = 0; i < seriesCount; i++) {{
-            html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px;">平均</th><th style="border-bottom:1px solid #bbb; padding:2px 4px;">標準偏差</th>';
-          }}
-          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px;"></th>';
-          html += '</tr>';
-          // データ行
-          for (let r = 0; r < historyData.length; r++) {{
-            html += '<tr>';
-            html += `<td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:center; font-weight:bold;">${{r + 1}}</td>`;
-            for (let i = 0; i < seriesCount; i++) {{
-              html += `<td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:right;">${{historyData[r][i]?.mean || ''}}</td><td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:right;">${{historyData[r][i]?.std || ''}}</td>`;
-            }}
-            html += `<td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:center;"><button onclick="deleteHistoryRow(${{r}})" style="background:#f44336; color:white; border:none; border-radius:2px; padding:1px 4px; font-size:10px; cursor:pointer;">削除</button></td>`;
-            html += '</tr>';
-          }}
-          // 平均行
-          if (historyData.length > 0) {{
-            html += '<tr style="background:#f4f4f4;">';
-            html += '<td style="font-weight:bold; text-align:center;">平均</td>';
-            for (let i = 0; i < seriesCount; i++) {{
-              let meanSum = 0, stdSum = 0, cnt = 0;
-              for (let r = 0; r < historyData.length; r++) {{
-                if (historyData[r][i]?.mean) {{ meanSum += parseFloat(historyData[r][i].mean); cnt++; }}
-              }}
-              for (let r = 0; r < historyData.length; r++) {{
-                if (historyData[r][i]?.std) {{ stdSum += parseFloat(historyData[r][i].std); }}
-              }}
-              html += `<td style="font-weight:bold; text-align:right;">${{cnt ? (meanSum/cnt).toFixed(4) : ''}}</td><td style="font-weight:bold; text-align:right;">${{cnt ? (stdSum/cnt).toFixed(4) : ''}}</td>`;
-            }}
-            html += '<td style="text-align:center;"></td>';
-            html += '</tr>';
-          }}
-          html += '</table>';
-          historyTableBlock.innerHTML = html;
-        }}
-        
-        function deleteHistoryRow(rowIndex) {{
-          if (rowIndex >= 0 && rowIndex < historyData.length) {{
-            historyData.splice(rowIndex, 1);
-            renderHistoryTable();
-          }}
-        }}
-        
-        saveHistoryBtn.addEventListener('click', function() {{
-          const row = getCurrentStats();
-          historyData.push(row);
-          renderHistoryTable();
-        }});
-        
-        resetHistoryBtn.addEventListener('click', function() {{
-          historyData = [];
-          renderHistoryTable();
+        showHistoryBtn.addEventListener('click', function() {{
+          window.pywebview.api.open_history_window();
         }});
         
         window.addEventListener('keydown', function(e) {{
           if ((e.ctrlKey || e.metaKey) && e.key === 's') {{
             e.preventDefault();
             const row = getCurrentStats();
-            historyData.push(row);
-            if (historyPopup.style.display === 'block') {{
-              renderHistoryTable();
+            window.pywebview.api.add_history_data(row);
+          }}
+        }});
+    </script>
+</body>
+</html>
+'''
+
+# 履歴ウィンドウ用HTMLテンプレート
+HISTORY_HTML_TEMPLATE = '''
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>ROI統計履歴</title>
+    <style>
+        body {{ font-family: sans-serif; margin: 0; padding: 0; background: white; }}
+        #header {{ background: #f5f5f5; padding: 8px 12px; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center; }}
+        #content {{ padding: 12px; height: calc(100vh - 60px); overflow: auto; }}
+        #history-table-block {{ margin-bottom: 60px; }}
+        .button-container {{ position: fixed; bottom: 12px; left: 12px; right: 12px; display: flex; gap: 8px; }}
+        .info-text {{ position: fixed; bottom: 12px; right: 12px; font-size: 11px; color: #888; }}
+        table {{ font-size: 11px; border-collapse: collapse; width: 100%; min-width: 400px; }}
+        th, td {{ border-bottom: 1px solid #eee; padding: 2px 4px; text-align: right; }}
+        th {{ border-bottom: 1px solid #bbb; }}
+        .delete-btn {{ background: #f44336; color: white; border: none; border-radius: 2px; padding: 1px 4px; font-size: 10px; cursor: pointer; }}
+        .save-btn {{ background: #2196f3; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
+        .reset-btn {{ background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
+    </style>
+</head>
+<body>
+    <div id="header">
+        <h3 style="font-size: 14px; margin: 0; color: #333;">ROI統計履歴</h3>
+        <button id="close-btn" style="background: #ff4444; color: white; border: none; border-radius: 4px; font-size: 12px; cursor: pointer; padding: 2px 6px;">×</button>
+    </div>
+    <div id="content">
+        <div id="history-table-block"></div>
+    </div>
+    <div class="button-container">
+        <button id="save-btn" class="save-btn">保存</button>
+        <button id="reset-btn" class="reset-btn">リセット</button>
+    </div>
+    <div class="info-text">Ctrl+Sでも保存できます</div>
+    
+    <script>
+        let historyData = [];
+        const historyTableBlock = document.getElementById('history-table-block');
+        const saveBtn = document.getElementById('save-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const closeBtn = document.getElementById('close-btn');
+        
+        function renderHistoryTable() {{
+            let html = '<table>';
+            // ヘッダ行
+            html += '<tr>';
+            html += '<th style="width: 40px;">番号</th>';
+            for (let i = 0; i < {series_count}; i++) {{
+                html += `<th colspan="2">Folder${{i + 1}}</th>`;
             }}
+            html += '<th style="width: 60px;">操作</th>';
+            html += '</tr>';
+            // サブヘッダ行
+            html += '<tr>';
+            html += '<th></th>';
+            for (let i = 0; i < {series_count}; i++) {{
+                html += '<th>平均</th><th>標準偏差</th>';
+            }}
+            html += '<th></th>';
+            html += '</tr>';
+            // データ行
+            for (let r = 0; r < historyData.length; r++) {{
+                html += '<tr>';
+                html += `<td style="text-align: center; font-weight: bold;">${{r + 1}}</td>`;
+                for (let i = 0; i < {series_count}; i++) {{
+                    html += `<td>${{historyData[r][i]?.mean || ''}}</td><td>${{historyData[r][i]?.std || ''}}</td>`;
+                }}
+                html += `<td style="text-align: center;"><button onclick="deleteHistoryRow(${{r}})" class="delete-btn">削除</button></td>`;
+                html += '</tr>';
+            }}
+            // 平均行
+            if (historyData.length > 0) {{
+                html += '<tr style="background: #f4f4f4;">';
+                html += '<td style="font-weight: bold; text-align: center;">平均</td>';
+                for (let i = 0; i < {series_count}; i++) {{
+                    let meanSum = 0, stdSum = 0, cnt = 0;
+                    for (let r = 0; r < historyData.length; r++) {{
+                        if (historyData[r][i]?.mean) {{ meanSum += parseFloat(historyData[r][i].mean); cnt++; }}
+                    }}
+                    for (let r = 0; r < historyData.length; r++) {{
+                        if (historyData[r][i]?.std) {{ stdSum += parseFloat(historyData[r][i].std); }}
+                    }}
+                    html += `<td style="font-weight: bold;">${{cnt ? (meanSum/cnt).toFixed(4) : ''}}</td><td style="font-weight: bold;">${{cnt ? (stdSum/cnt).toFixed(4) : ''}}</td>`;
+                }}
+                html += '<td></td>';
+                html += '</tr>';
+            }}
+            html += '</table>';
+            historyTableBlock.innerHTML = html;
+        }}
+        
+        function deleteHistoryRow(rowIndex) {{
+            if (rowIndex >= 0 && rowIndex < historyData.length) {{
+                historyData.splice(rowIndex, 1);
+                renderHistoryTable();
+            }}
+        }}
+        
+        saveBtn.addEventListener('click', function() {{
+            window.pywebview.api.save_history_data(historyData);
+        }});
+        
+        resetBtn.addEventListener('click', function() {{
+            historyData = [];
+            renderHistoryTable();
+        }});
+        
+        closeBtn.addEventListener('click', function() {{
+            window.pywebview.api.close_history_window();
+        }});
+        
+        window.addEventListener('keydown', function(e) {{
+            if ((e.ctrlKey || e.metaKey) && e.key === 's') {{
+                e.preventDefault();
+                window.pywebview.api.save_history_data(historyData);
             }}
         }});
+        
+        // 初期表示
+        renderHistoryTable();
     </script>
 </body>
 </html>
@@ -614,6 +544,8 @@ class DicomWebApi:
         self.series_count = len(self.images_list)
         self.series_max_idx_list = [len(images) - 1 for images in self.images_list]
         self.global_max_idx = min(self.series_max_idx_list) if self.series_count > 0 else 0
+        self.history_window = None
+        self.history_data = []
 
     def load_all_folders(self, folders):
         all_images = []
@@ -730,40 +662,14 @@ class DicomWebApi:
         ])
         col_num = min(self.series_count, 4) if self.series_count > 1 else 1
         
-        # 履歴ポップアップHTML（ドラッグ・リサイズ可能な独立ウィンドウ）
-        history_popup_html = '''
-    <div id="history-popup" style="display:none; position:fixed; top:50px; left:50px; width:600px; height:400px; min-width:400px; min-height:300px; background:white; border:2px solid #ccc; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.18); z-index:2000; overflow:hidden;">
-      <div id="history-header" style="background:#f5f5f5; padding:8px 12px; border-bottom:1px solid #ddd; cursor:move; user-select:none; display:flex; justify-content:space-between; align-items:center;">
-        <h3 style="font-size:14px; margin:0; color:#333;">ROI統計履歴</h3>
-        <button id="close-history-btn" style="background:#ff4444; color:white; border:none; border-radius:4px; font-size:12px; cursor:pointer; padding:2px 6px;">×</button>
-      </div>
-      <div id="history-content" style="padding:12px; height:calc(100% - 40px); overflow:auto;">
-        <div id="history-table-block"></div>
-        <div style="margin-top:10px; display:flex; gap:8px; position:absolute; bottom:12px; left:12px; right:12px;">
-          <button id="save-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#2196f3; color:white; cursor:pointer;">保存</button>
-          <button id="reset-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#f44336; color:white; cursor:pointer;">リセット</button>
-        </div>
-        <div style="font-size:11px; color:#888; margin-top:6px; position:absolute; bottom:12px; right:12px;">Ctrl+Sでも保存できます</div>
-      </div>
-      <div id="resize-n" style="position:absolute; top:0; left:0; right:0; height:5px; cursor:n-resize;"></div>
-      <div id="resize-s" style="position:absolute; bottom:0; left:0; right:0; height:5px; cursor:s-resize;"></div>
-      <div id="resize-e" style="position:absolute; top:0; right:0; bottom:0; width:5px; cursor:e-resize;"></div>
-      <div id="resize-w" style="position:absolute; top:0; left:0; bottom:0; width:5px; cursor:w-resize;"></div>
-      <div id="resize-nw" style="position:absolute; top:0; left:0; width:10px; height:10px; cursor:nw-resize;"></div>
-      <div id="resize-ne" style="position:absolute; top:0; right:0; width:10px; height:10px; cursor:ne-resize;"></div>
-      <div id="resize-sw" style="position:absolute; bottom:0; left:0; width:10px; height:10px; cursor:sw-resize;"></div>
-      <div id="resize-se" style="position:absolute; bottom:0; right:0; width:10px; height:10px; cursor:se-resize;"></div>
-    </div>'''
-        
-        # HTMLテンプレートに履歴ポップアップを動的に挿入
+        # HTMLテンプレートに動的に挿入
         html_content = HTML_TEMPLATE.format(
             series_blocks=series_blocks,
             global_max_idx=self.global_max_idx,
             global_max_idx_plus1=self.global_max_idx + 1,
             series_count=self.series_count,
             series_max_idx_list=self.series_max_idx_list,
-            col_num=col_num,
-            history_popup=history_popup_html
+            col_num=col_num
         )
         
         return html_content
@@ -862,6 +768,32 @@ class DicomWebApi:
             return self.folder_types[series_idx]
         return "folder1"
 
+    # 履歴ウィンドウ関連API
+    def open_history_window(self):
+        if self.history_window is None:
+            history_html = HISTORY_HTML_TEMPLATE.format(series_count=self.series_count)
+            self.history_window = webview.create_window('ROI統計履歴', html=history_html, js_api=self, width=800, height=600, resizable=True)
+            self.history_window.events.loaded += self.on_history_window_loaded
+        else:
+            self.history_window.show()
+
+    def on_history_window_loaded(self):
+        # 履歴ウィンドウが読み込まれた時の処理
+        pass
+
+    def add_history_data(self, row_data):
+        self.history_data.append(row_data)
+        if self.history_window:
+            self.history_window.evaluate_js(f"historyData.push({row_data}); renderHistoryTable();")
+
+    def save_history_data(self, history_data):
+        self.history_data = history_data
+        print("履歴データを保存しました")
+
+    def close_history_window(self):
+        if self.history_window:
+            self.history_window.hide()
+
 if __name__ == '__main__':
     import sys
     if len(sys.argv) < 2:
@@ -871,4 +803,4 @@ if __name__ == '__main__':
     api = DicomWebApi(folders)
     html = api.get_init_html()
     window = webview.create_window('DICOM Web Viewer (Multi-Series)', html=html, js_api=api, width=1200, height=900)
-    webview.start(debug=True) 
+    webview.start(debug=False) 
