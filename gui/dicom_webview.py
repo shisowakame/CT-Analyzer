@@ -385,12 +385,16 @@ HTML_TEMPLATE = '''
         const resetHistoryBtn = document.getElementById('reset-history-btn');
         const historyTableBlock = document.getElementById('history-table-block');
         
-        // ドラッグ機能の変数
+        // ドラッグ・リサイズ機能の変数
         let isDragging = false;
+        let isResizing = false;
+        let resizeDirection = '';
         let dragStartX = 0;
         let dragStartY = 0;
         let popupStartX = 0;
         let popupStartY = 0;
+        let popupStartWidth = 0;
+        let popupStartHeight = 0;
         
         // ドラッグ開始
         function startDrag(e) {{
@@ -405,6 +409,22 @@ HTML_TEMPLATE = '''
           e.preventDefault();
         }}
         
+        // リサイズ開始
+        function startResize(e, direction) {{
+          isResizing = true;
+          resizeDirection = direction;
+          dragStartX = e.clientX;
+          dragStartY = e.clientY;
+          const rect = historyPopup.getBoundingClientRect();
+          popupStartX = rect.left;
+          popupStartY = rect.top;
+          popupStartWidth = rect.width;
+          popupStartHeight = rect.height;
+          document.addEventListener('mousemove', onResize);
+          document.addEventListener('mouseup', stopResize);
+          e.preventDefault();
+        }}
+        
         // ドラッグ中
         function onDrag(e) {{
           if (!isDragging) return;
@@ -414,6 +434,42 @@ HTML_TEMPLATE = '''
           historyPopup.style.top = (popupStartY + deltaY) + 'px';
         }}
         
+        // リサイズ中
+        function onResize(e) {{
+          if (!isResizing) return;
+          const deltaX = e.clientX - dragStartX;
+          const deltaY = e.clientY - dragStartY;
+          
+          let newLeft = popupStartX;
+          let newTop = popupStartY;
+          let newWidth = popupStartWidth;
+          let newHeight = popupStartHeight;
+          
+          if (resizeDirection.includes('w')) {{
+            newLeft = popupStartX + deltaX;
+            newWidth = popupStartWidth - deltaX;
+          }}
+          if (resizeDirection.includes('e')) {{
+            newWidth = popupStartWidth + deltaX;
+          }}
+          if (resizeDirection.includes('n')) {{
+            newTop = popupStartY + deltaY;
+            newHeight = popupStartHeight - deltaY;
+          }}
+          if (resizeDirection.includes('s')) {{
+            newHeight = popupStartHeight + deltaY;
+          }}
+          
+          // 最小サイズ制限
+          newWidth = Math.max(400, newWidth);
+          newHeight = Math.max(300, newHeight);
+          
+          historyPopup.style.left = newLeft + 'px';
+          historyPopup.style.top = newTop + 'px';
+          historyPopup.style.width = newWidth + 'px';
+          historyPopup.style.height = newHeight + 'px';
+        }}
+        
         // ドラッグ終了
         function stopDrag() {{
           isDragging = false;
@@ -421,9 +477,27 @@ HTML_TEMPLATE = '''
           document.removeEventListener('mouseup', stopDrag);
         }}
         
+        // リサイズ終了
+        function stopResize() {{
+          isResizing = false;
+          resizeDirection = '';
+          document.removeEventListener('mousemove', onResize);
+          document.removeEventListener('mouseup', stopResize);
+        }}
+        
         // ヘッダーにドラッグイベントを追加
         const historyHeader = document.getElementById('history-header');
         historyHeader.addEventListener('mousedown', startDrag);
+        
+        // 各リサイズハンドルにリサイズイベントを追加
+        document.getElementById('resize-n').addEventListener('mousedown', (e) => startResize(e, 'n'));
+        document.getElementById('resize-s').addEventListener('mousedown', (e) => startResize(e, 's'));
+        document.getElementById('resize-e').addEventListener('mousedown', (e) => startResize(e, 'e'));
+        document.getElementById('resize-w').addEventListener('mousedown', (e) => startResize(e, 'w'));
+        document.getElementById('resize-nw').addEventListener('mousedown', (e) => startResize(e, 'nw'));
+        document.getElementById('resize-ne').addEventListener('mousedown', (e) => startResize(e, 'ne'));
+        document.getElementById('resize-sw').addEventListener('mousedown', (e) => startResize(e, 'sw'));
+        document.getElementById('resize-se').addEventListener('mousedown', (e) => startResize(e, 'se'));
         
         showHistoryBtn.addEventListener('click', function() {{
           historyPopup.style.display = 'block';
@@ -526,7 +600,7 @@ HTML_TEMPLATE = '''
             if (historyPopup.style.display === 'block') {{
               renderHistoryTable();
             }}
-          }}
+            }}
         }});
     </script>
 </body>
@@ -656,9 +730,9 @@ class DicomWebApi:
         ])
         col_num = min(self.series_count, 4) if self.series_count > 1 else 1
         
-        # 履歴ポップアップHTML（ドラッグ可能な独立ウィンドウ）
+        # 履歴ポップアップHTML（ドラッグ・リサイズ可能な独立ウィンドウ）
         history_popup_html = '''
-    <div id="history-popup" style="display:none; position:fixed; top:50px; left:50px; width:600px; height:400px; background:white; border:2px solid #ccc; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.18); z-index:2000; overflow:hidden;">
+    <div id="history-popup" style="display:none; position:fixed; top:50px; left:50px; width:600px; height:400px; min-width:400px; min-height:300px; background:white; border:2px solid #ccc; border-radius:8px; box-shadow:0 4px 24px rgba(0,0,0,0.18); z-index:2000; overflow:hidden;">
       <div id="history-header" style="background:#f5f5f5; padding:8px 12px; border-bottom:1px solid #ddd; cursor:move; user-select:none; display:flex; justify-content:space-between; align-items:center;">
         <h3 style="font-size:14px; margin:0; color:#333;">ROI統計履歴</h3>
         <button id="close-history-btn" style="background:#ff4444; color:white; border:none; border-radius:4px; font-size:12px; cursor:pointer; padding:2px 6px;">×</button>
@@ -671,6 +745,14 @@ class DicomWebApi:
         </div>
         <div style="font-size:11px; color:#888; margin-top:6px; position:absolute; bottom:12px; right:12px;">Ctrl+Sでも保存できます</div>
       </div>
+      <div id="resize-n" style="position:absolute; top:0; left:0; right:0; height:5px; cursor:n-resize;"></div>
+      <div id="resize-s" style="position:absolute; bottom:0; left:0; right:0; height:5px; cursor:s-resize;"></div>
+      <div id="resize-e" style="position:absolute; top:0; right:0; bottom:0; width:5px; cursor:e-resize;"></div>
+      <div id="resize-w" style="position:absolute; top:0; left:0; bottom:0; width:5px; cursor:w-resize;"></div>
+      <div id="resize-nw" style="position:absolute; top:0; left:0; width:10px; height:10px; cursor:nw-resize;"></div>
+      <div id="resize-ne" style="position:absolute; top:0; right:0; width:10px; height:10px; cursor:ne-resize;"></div>
+      <div id="resize-sw" style="position:absolute; bottom:0; left:0; width:10px; height:10px; cursor:sw-resize;"></div>
+      <div id="resize-se" style="position:absolute; bottom:0; right:0; width:10px; height:10px; cursor:se-resize;"></div>
     </div>'''
         
         # HTMLテンプレートに履歴ポップアップを動的に挿入
