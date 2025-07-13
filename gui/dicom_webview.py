@@ -417,25 +417,36 @@ HTML_TEMPLATE = '''
         
         function renderHistoryTable() {{
           let html = '<table style="font-size:11px; border-collapse:collapse; width:100%; min-width:400px;">';
+          // ヘッダ行
           html += '<tr>';
+          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px; width:40px;">番号</th>';
           for (let i = 0; i < seriesCount; i++) {{
             html += `<th colspan="2" style="border-bottom:1px solid #bbb; padding:2px 4px;">${{document.querySelector(`[onclick="showFolderSelector(${{i}})"]`)?.textContent.replace(' ▼','') || 'Series ' + i}}</th>`;
           }}
+          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px; width:60px;">操作</th>';
           html += '</tr>';
+          // サブヘッダ行
           html += '<tr>';
+          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px;"></th>';
           for (let i = 0; i < seriesCount; i++) {{
             html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px;">平均</th><th style="border-bottom:1px solid #bbb; padding:2px 4px;">標準偏差</th>';
           }}
+          html += '<th style="border-bottom:1px solid #bbb; padding:2px 4px;"></th>';
           html += '</tr>';
+          // データ行
           for (let r = 0; r < historyData.length; r++) {{
             html += '<tr>';
+            html += `<td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:center; font-weight:bold;">${{r + 1}}</td>`;
             for (let i = 0; i < seriesCount; i++) {{
               html += `<td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:right;">${{historyData[r][i]?.mean || ''}}</td><td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:right;">${{historyData[r][i]?.std || ''}}</td>`;
             }}
+            html += `<td style="border-bottom:1px solid #eee; padding:2px 4px; text-align:center;"><button onclick="deleteHistoryRow(${{r}})" style="background:#f44336; color:white; border:none; border-radius:2px; padding:1px 4px; font-size:10px; cursor:pointer;">削除</button></td>`;
             html += '</tr>';
           }}
+          // 平均行
           if (historyData.length > 0) {{
             html += '<tr style="background:#f4f4f4;">';
+            html += '<td style="font-weight:bold; text-align:center;">平均</td>';
             for (let i = 0; i < seriesCount; i++) {{
               let meanSum = 0, stdSum = 0, cnt = 0;
               for (let r = 0; r < historyData.length; r++) {{
@@ -446,10 +457,18 @@ HTML_TEMPLATE = '''
               }}
               html += `<td style="font-weight:bold; text-align:right;">${{cnt ? (meanSum/cnt).toFixed(4) : ''}}</td><td style="font-weight:bold; text-align:right;">${{cnt ? (stdSum/cnt).toFixed(4) : ''}}</td>`;
             }}
+            html += '<td style="text-align:center;"></td>';
             html += '</tr>';
           }}
           html += '</table>';
           historyTableBlock.innerHTML = html;
+        }}
+        
+        function deleteHistoryRow(rowIndex) {{
+          if (rowIndex >= 0 && rowIndex < historyData.length) {{
+            historyData.splice(rowIndex, 1);
+            renderHistoryTable();
+          }}
         }}
         
         saveHistoryBtn.addEventListener('click', function() {{
