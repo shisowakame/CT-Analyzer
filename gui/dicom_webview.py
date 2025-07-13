@@ -59,7 +59,7 @@ HTML_TEMPLATE = '''
     </div>
     <div id="global-slider-block">
         <input type="range" id="global-slider" min="0" max="{global_max_idx}" value="0" />
-        <span id="global-slice-label">Slice: 0/{global_max_idx}</span>
+        <span id="global-slice-label">Slice: 1/{global_max_idx_plus1}</span>
     </div>
 {history_popup}
     <script>
@@ -202,7 +202,7 @@ HTML_TEMPLATE = '''
                 sliders[seriesIdx].value = 0;
                 sliders[seriesIdx].max = result.max_idx;
                 currentSlices[seriesIdx] = 0;
-                labels[seriesIdx].textContent = `Slice: 0/${{result.max_idx}}`;
+                labels[seriesIdx].textContent = `Slice: 1/${{result.max_idx + 1}}`;
                 
                 // ファイル名を更新
                 const filename = await window.pywebview.api.get_filename(seriesIdx, 0);
@@ -328,7 +328,7 @@ HTML_TEMPLATE = '''
             sliders[i].addEventListener('input', async function() {{
                 const idx = sliders[i].value;
                 currentSlices[i] = parseInt(idx);
-                labels[i].textContent = `Slice: ${{idx}}/${{seriesMaxIdxList[i]}}`;
+                labels[i].textContent = `Slice: ${{parseInt(idx) + 1}}/${{seriesMaxIdxList[i] + 1}}`;
                 const filename = await window.pywebview.api.get_filename(i, idx);
                 filenames[i].textContent = filename;
                 const b64 = await window.pywebview.api.get_single_slice(i, idx);
@@ -351,11 +351,11 @@ HTML_TEMPLATE = '''
         const globalLabel = document.getElementById('global-slice-label');
         globalSlider.addEventListener('input', async function() {{
             const idx = globalSlider.value;
-            globalLabel.textContent = `Slice: ${{idx}}/${{globalSlider.max}}`;
+            globalLabel.textContent = `Slice: ${{parseInt(idx) + 1}}/${{parseInt(globalSlider.max) + 1}}`;
             for (let i = 0; i < seriesCount; i++) {{
                 currentSlices[i] = parseInt(idx);
                 sliders[i].value = idx;
-                labels[i].textContent = `Slice: ${{idx}}/${{seriesMaxIdxList[i]}}`;
+                labels[i].textContent = `Slice: ${{parseInt(idx) + 1}}/${{seriesMaxIdxList[i] + 1}}`;
                 const filename = await window.pywebview.api.get_filename(i, idx);
                 filenames[i].textContent = filename;
                 const img = imgs[i];
@@ -614,7 +614,7 @@ class DicomWebApi:
             f'<canvas class="roi-canvas" id="roi-canvas-{i}" width="{img_shapes[i][1]}" height="{img_shapes[i][0]}" style="position:absolute; left:0; top:0; z-index:2; pointer-events:auto;"></canvas>'
             f'<div class="info-panel" id="info-panel-{i}"></div>'
             f'<input type="range" class="slider" id="slider-{i}" min="0" max="{self.series_max_idx_list[i]}" value="0" />'
-            f'<div style="display: flex; gap: 5px; margin-top: 5px;"><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="slice-label-{i}" style="font-weight: bold;">Slice: 0/{self.series_max_idx_list[i]}</span></div><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="filename-{i}">{self.file_names_list[i][0] if len(self.file_names_list[i]) > 0 else ""}</span></div></div>'
+            f'<div style="display: flex; gap: 5px; margin-top: 5px;"><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="slice-label-{i}" style="font-weight: bold;">Slice: 1/{self.series_max_idx_list[i] + 1}</span></div><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="filename-{i}">{self.file_names_list[i][0] if len(self.file_names_list[i]) > 0 else ""}</span></div></div>'
             f'</div>'
             for i, b64 in enumerate(b64list)
         ])
@@ -639,6 +639,7 @@ class DicomWebApi:
         html_content = HTML_TEMPLATE.format(
             series_blocks=series_blocks,
             global_max_idx=self.global_max_idx,
+            global_max_idx_plus1=self.global_max_idx + 1,
             series_count=self.series_count,
             series_max_idx_list=self.series_max_idx_list,
             col_num=col_num,
