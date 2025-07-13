@@ -484,10 +484,10 @@ HTML_TEMPLATE = '''
         
         window.addEventListener('keydown', function(e) {{
           if ((e.ctrlKey || e.metaKey) && e.key === 's') {{
+            e.preventDefault();
+            const row = getCurrentStats();
+            historyData.push(row);
             if (historyPopup.style.display === 'flex') {{
-              e.preventDefault();
-              const row = getCurrentStats();
-              historyData.push(row);
               renderHistoryTable();
             }}
           }}
