@@ -15,9 +15,9 @@ HTML_TEMPLATE = '''
     <title>DICOM Web Viewer (Multi-Series)</title>
     <style>
         body {{ font-family: sans-serif; margin: 20px; }}
-        .main-container {{ display: flex; gap: 20px; align-items: flex-start; }}
-        .left-panel {{ flex: 1 1 auto; }}
-        .right-panel {{ flex: 0 0 340px; min-width: 300px; margin-top: 0px; }}
+        .main-container {{ display: flex; gap: 20px; align-items: flex-start; width: 100vw; box-sizing: border-box; }}
+        .left-panel {{ flex: 0 0 66.66vw; width: 66.66vw; }}
+        .right-panel {{ flex: 0 0 33.33vw; min-width: 300px; margin-top: 0px; width: 33.33vw; }}
         #toolbar {{ margin-bottom: 16px; padding: 8px 0; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; gap: 10px; }}
         #toolbar label {{ margin-right: 4px; }}
         #toolbar input[type='number'] {{ width: 48px; }}
@@ -68,15 +68,32 @@ HTML_TEMPLATE = '''
         .info-text {{ font-size: 11px; color: #888; margin-top: 8px; }}
         h2 {{ margin-top: 0; font-size: clamp(1rem, 1.7vw, 1.2rem); }}
         #toolbar span:first-child {{ margin-left: 10px; }}
-        :root {{ --right-panel-width: 340px; }}
-        .right-panel {{ flex: 0 0 var(--right-panel-width); min-width: 300px; margin-top: 0px; }}
-        #history-avg-row-block {{ max-width: var(--right-panel-width); width: 100%; overflow-x: auto; }}
-        #history-avg-row-block > table {{ max-width: var(--right-panel-width); width: 100%; box-sizing: border-box; }}
+        .right-panel {{ flex: 0 0 30vw; min-width: 300px; margin-top: 0px; width: 30vw; }}
+        #history-avg-row-block {{ max-width: 30vw; width: 100%; overflow-x: auto; }}
+        #history-avg-row-block > table {{ max-width: 30vw; width: 100%; box-sizing: border-box; }}
+        #grid {{
+            width: var(--dicom-grid-width);
+            margin-left: 25px;
+            display: grid;
+            grid-template-columns: repeat({col_num}, 1fr);
+            gap: 20px;
+        }}
+        #toolbar {{
+            width: var(--dicom-grid-width);
+            margin-left: 25px;
+            margin-bottom: 16px;
+            padding: 8px 0;
+            background: #f0f0f0;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }}
     </style>
 </head>
 <body>
     <div class="main-container" style="display: flex; gap: 20px; align-items: flex-start;">
-        <div class="left-panel" style="flex: 1 1 auto;">
+        <div class="left-panel">
             <h2>DICOM Web Viewer (Multi-Series)</h2>
             <div id="toolbar">
                 <div style="display: flex; align-items: center; gap: 8px;">
@@ -104,7 +121,7 @@ HTML_TEMPLATE = '''
                 <span id="global-slice-label">Slice: 1/{global_max_idx_plus1}</span>
             </div>
         </div>
-        <div class="right-panel" style="flex: 0 0 340px; min-width: 300px;">
+        <div class="right-panel">
             <div class="history-panel">
                 <div class="history-header">
                     <h3>ROI統計履歴</h3>
@@ -148,11 +165,13 @@ HTML_TEMPLATE = '''
             let html = '<table class="history-table">';
             // ヘッダ行
             html += '<tr>';
-            html += '<th style="width: 40px;">番号</th>';
+            //html += '<th style="width: 40px;">番号</th>';
+            html += '<th style="width: 40px;"> </th>';
             for (let i = 0; i < seriesCount; i++) {{
                 html += '<th colspan="2">Folder' + (i + 1) + '</th>';
             }}
-            html += '<th style="width: 60px;">操作</th>';
+            //html += '<th style="width: 60px;">操作</th>';
+            html += '<th style="width: 60px;"> </th>';
             html += '</tr>';
             // サブヘッダ行
             html += '<tr>';
