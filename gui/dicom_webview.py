@@ -57,8 +57,8 @@ HTML_TEMPLATE = '''
         .history-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }}
         .history-header h3 {{ margin: 0; font-size: 14px; color: #333; }}
         .history-controls {{ display: flex; gap: 8px; }}
-        .history-content {{ max-height: 500px; overflow-y: auto; }}
-        .history-table-block {{ margin-bottom: 12px; }}
+        .history-content {{ }}
+        .history-table-block {{ max-height: 70vh; overflow-y: auto; }}
         .history-table {{ font-size: 11px; border-collapse: collapse; width: 100%; }}
         .history-table th, .history-table td {{ border-bottom: 1px solid #eee; padding: 2px 4px; text-align: right; }}
         .history-table th {{ border-bottom: 1px solid #bbb; background: #f5f5f5; }}
@@ -67,6 +67,11 @@ HTML_TEMPLATE = '''
         .reset-btn {{ background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
         .info-text {{ font-size: 11px; color: #888; margin-top: 8px; }}
         h2 {{ margin-top: 0; font-size: clamp(1rem, 1.7vw, 1.2rem); }}
+        #toolbar span:first-child {{ margin-left: 10px; }}
+        :root {{ --right-panel-width: 340px; }}
+        .right-panel {{ flex: 0 0 var(--right-panel-width); min-width: 300px; margin-top: 0px; }}
+        #history-avg-row-block {{ max-width: var(--right-panel-width); width: 100%; overflow-x: auto; }}
+        #history-avg-row-block > table {{ max-width: var(--right-panel-width); width: 100%; box-sizing: border-box; }}
     </style>
 </head>
 <body>
@@ -110,6 +115,7 @@ HTML_TEMPLATE = '''
                 </div>
                 <div class="history-content">
                     <div id="history-table-block" class="history-table-block"></div>
+                    <div id="history-avg-row-block"></div>
                 </div>
                 <div class="info-text">Ctrl+Sでも保存できます</div>
             </div>
@@ -165,13 +171,18 @@ HTML_TEMPLATE = '''
                     const stdVal = historyData[r][i] && historyData[r][i].std ? historyData[r][i].std : '';
                     html += '<td>' + meanVal + '</td><td>' + stdVal + '</td>';
                 }}
-                html += '<td style="text-align: center;"><button onclick="deleteHistoryRow(' + r + ')" class="delete-btn">削除</button></td>';
+                html += '<td style="text-align: center;"><button onclick="deleteHistoryRow(' + r + ')" class="delete-btn">×</button></td>';
                 html += '</tr>';
             }}
-            // 平均行
+            html += '</table>';
+            historyTableBlock.innerHTML = html;
+
+            // 平均行分離
+            let avgHtml = '';
             if (historyData.length > 0) {{
-                html += '<tr style="background: #f4f4f4;">';
-                html += '<td style="font-weight: bold; text-align: center;">平均</td>';
+                avgHtml += '<table class="history-table" style="background: #f4f4f4;">';
+                avgHtml += '<tr style="background: #f4f4f4;">';
+                avgHtml += '<td style="font-weight: bold; text-align: center;">平均</td>';
                 for (let i = 0; i < seriesCount; i++) {{
                     let meanSum = 0, stdSum = 0, cnt = 0;
                     for (let r = 0; r < historyData.length; r++) {{
@@ -187,13 +198,13 @@ HTML_TEMPLATE = '''
                     }}
                     const avgMean = cnt ? (meanSum/cnt).toFixed(4) : '';
                     const avgStd = cnt ? (stdSum/cnt).toFixed(4) : '';
-                    html += '<td style="font-weight: bold;">' + avgMean + '</td><td style="font-weight: bold;">' + avgStd + '</td>';
+                    avgHtml += '<td style="font-weight: bold;">' + avgMean + '</td><td style="font-weight: bold;">' + avgStd + '</td>';
                 }}
-                html += '<td></td>';
-                html += '</tr>';
+                avgHtml += '<td></td>';
+                avgHtml += '</tr>';
+                avgHtml += '</table>';
             }}
-            html += '</table>';
-            historyTableBlock.innerHTML = html;
+            document.getElementById('history-avg-row-block').innerHTML = avgHtml;
         }}
         
         // 履歴行削除関数
