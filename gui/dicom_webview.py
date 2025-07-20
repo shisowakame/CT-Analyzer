@@ -542,9 +542,50 @@ HTML_TEMPLATE = '''
             try {{
                 const metadata = await window.pywebview.api.get_metadata(idx, currentSlices[idx]);
                 const popup = document.createElement('div');
-                popup.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 2px solid #ccc; border-radius: 8px; padding: 20px; max-width: 80vw; max-height: 80vh; overflow: auto; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.3);';
-                popup.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;"><h3 style="margin: 0;">DICOMメタデータ</h3><button onclick="this.parentElement.parentElement.remove()" style="background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">×</button></div><pre style="font-family: monospace; font-size: 12px; margin: 0; white-space: pre-wrap;">' + metadata + '</pre>';
+                popup.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 2px solid #ccc; border-radius: 8px; padding: 20px; max-width: 90vw; max-height: 90vh; overflow: hidden; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.3); display: flex; flex-direction: column;';
+                
+                const headerHtml = `
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0;">
+                        <h3 style="margin: 0;">DICOMメタデータ</h3>
+                        <div style="display: flex; gap: 8px;">
+                            <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">×</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 10px; flex-shrink: 0;">
+                        <input type="text" id="metadata-search" placeholder="メタデータを検索..." style="width: 100%; padding: 6px; border: 1px solid #ccc; border-radius: 4px; font-size: 12px;">
+                    </div>
+                `;
+                
+                const contentHtml = `
+                    <div id="metadata-content" style="flex: 1; overflow: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #f9f9f9;">
+                        <pre id="metadata-text" style="font-family: monospace; font-size: 12px; margin: 0; white-space: pre-wrap;">` + metadata + `</pre>
+                    </div>
+                `;
+                
+                popup.innerHTML = headerHtml + contentHtml;
                 document.body.appendChild(popup);
+                
+                // 検索機能
+                const searchInput = document.getElementById('metadata-search');
+                const metadataText = document.getElementById('metadata-text');
+                const originalText = metadataText.textContent;
+                
+                searchInput.addEventListener('input', function() {{
+                    const searchTerm = this.value.toLowerCase();
+                    if (searchTerm === '') {{
+                        metadataText.textContent = originalText;
+                        return;
+                    }}
+                    
+                    const lines = originalText.split('\\n');
+                    const filteredLines = lines.filter(line => 
+                        line.toLowerCase().includes(searchTerm)
+                    );
+                    metadataText.textContent = filteredLines.join('\\n');
+                }});
+                
+
+                
             }} catch (error) {{
                 alert('メタデータの取得に失敗しました: ' + error);
             }}
