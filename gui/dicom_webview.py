@@ -412,6 +412,21 @@ HTML_TEMPLATE = '''
                 const folderName = await window.pywebview.api.get_current_folder_name(seriesIdx);
                 const folderElement = document.querySelector('[onclick="showFolderSelector(' + seriesIdx + ')"]');
                 folderElement.textContent = folderName + ' ▼';
+                
+                // 全体シークバーの分母を更新
+                const globalMaxIdx = Math.min(...Array.from({{length: seriesCount}}, (_, i) => parseInt(sliders[i].max)));
+                const oldGlobalMax = parseInt(globalSlider.max);
+                globalSlider.max = globalMaxIdx;
+                
+                // 最小値に変更があった場合のみ位置をリセット
+                if (globalMaxIdx < oldGlobalMax) {{
+                    globalSlider.value = 0;
+                    globalLabel.textContent = 'Slice: 1/' + (globalMaxIdx + 1);
+                }} else {{
+                    // 位置はそのまま、ラベルのみ更新
+                    const currentValue = parseInt(globalSlider.value);
+                    globalLabel.textContent = 'Slice: ' + (currentValue + 1) + '/' + (globalMaxIdx + 1);
+                }}
             }}
         }}
         
@@ -569,7 +584,7 @@ HTML_TEMPLATE = '''
             sliders[i].addEventListener('input', async function() {{
                 const idx = sliders[i].value;
                 currentSlices[i] = parseInt(idx);
-                labels[i].textContent = 'Slice: ' + (parseInt(idx) + 1) + '/' + (seriesMaxIdxList[i] + 1);
+                labels[i].textContent = 'Slice: ' + (parseInt(idx) + 1) + '/' + (parseInt(sliders[i].max) + 1);
                 const filename = await window.pywebview.api.get_filename(i, idx);
                 filenames[i].textContent = filename;
                 const b64 = await window.pywebview.api.get_single_slice(i, idx);
@@ -597,7 +612,7 @@ HTML_TEMPLATE = '''
             for (let i = 0; i < seriesCount; i++) {{
                 currentSlices[i] = parseInt(idx);
                 sliders[i].value = idx;
-                labels[i].textContent = 'Slice: ' + (parseInt(idx) + 1) + '/' + (seriesMaxIdxList[i] + 1);
+                labels[i].textContent = 'Slice: ' + (parseInt(idx) + 1) + '/' + (parseInt(sliders[i].max) + 1);
                 const filename = await window.pywebview.api.get_filename(i, idx);
                 filenames[i].textContent = filename;
                 const img = imgs[i];
@@ -825,7 +840,7 @@ class DicomWebApi:
                 current_folder = None
                 for folder in self.all_subfolders[series_idx]:
                     test_images, _, test_files = self.load_single_folder(folder)
-                    if test_files and test_files[0] == current_filename:
+                    if test_files and current_filename in test_files:
                         current_folder = folder
                         break
                 if current_folder is None:
