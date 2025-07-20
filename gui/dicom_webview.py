@@ -515,7 +515,35 @@ HTML_TEMPLATE = '''
             const x = roiCoords[idx].x, y = roiCoords[idx].y;
             const stats = await window.pywebview.api.get_roi_stats(idx, currentSlices[idx], x, y, roiW, roiH);
             const img = imgs[idx];
-            infoPanels[idx].innerHTML = '画像サイズ: ' + img.naturalWidth + 'x' + img.naturalHeight + '<br>ROI: [' + x + ',' + y + '] ' + roiW + 'x' + roiH + '<br>平均: ' + stats.mean + '<br>標準偏差: ' + stats.std;
+            infoPanels[idx].innerHTML = '画像サイズ: ' + img.naturalWidth + 'x' + img.naturalHeight + '<br>ROI: [' + 
+                '<input type="number" id="roi-x-' + idx + '" value="' + x + '" style="width: 40px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">,' + 
+                '<input type="number" id="roi-y-' + idx + '" value="' + y + '" style="width: 40px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">] ' + roiW + 'x' + roiH + 
+                '<br>平均: ' + stats.mean + '<br>標準偏差: ' + stats.std;
+        }}
+        
+        // 座標入力からROI更新
+        function updateROIFromInput(idx) {{
+            const xInput = document.getElementById('roi-x-' + idx);
+            const yInput = document.getElementById('roi-y-' + idx);
+            const x = parseInt(xInput.value);
+            const y = parseInt(yInput.value);
+            const img = imgs[idx];
+            
+            if (isNaN(x) || isNaN(y)) return;
+            if (x < 0 || y < 0 || x + roiW > img.naturalWidth || y + roiH > img.naturalHeight) {{
+                alert('ROIが画像範囲外です');
+                return;
+            }}
+            
+            if (syncMode) {{
+                for (let j = 0; j < seriesCount; j++) roiCoords[j] = {{x: x, y: y}};
+                redrawAllROIs();
+                updateAllStats();
+            }} else {{
+                roiCoords[idx] = {{x: x, y: y}};
+                drawROI(idx);
+                updateStats(idx);
+            }}
         }}
         
         function updateAllStats() {{
