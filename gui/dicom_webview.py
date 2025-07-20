@@ -516,9 +516,23 @@ HTML_TEMPLATE = '''
             const stats = await window.pywebview.api.get_roi_stats(idx, currentSlices[idx], x, y, roiW, roiH);
             const img = imgs[idx];
             infoPanels[idx].innerHTML = '画像サイズ: ' + img.naturalWidth + 'x' + img.naturalHeight + '<br>ROI: [' + 
-                '<input type="number" id="roi-x-' + idx + '" value="' + x + '" style="width: 40px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">,' + 
-                '<input type="number" id="roi-y-' + idx + '" value="' + y + '" style="width: 40px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">] ' + roiW + 'x' + roiH + 
-                '<br>平均: ' + stats.mean + '<br>標準偏差: ' + stats.std;
+                '<input type="number" id="roi-x-' + idx + '" value="' + x + '" style="width: 50px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">,' + 
+                '<input type="number" id="roi-y-' + idx + '" value="' + y + '" style="width: 50px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">] ' + roiW + 'x' + roiH + 
+                '<br>平均: ' + stats.mean + '<br>標準偏差: ' + stats.std + 
+                '<span style="position: absolute; bottom: 2px; right: 2px; cursor: pointer; font-size: 12px; color: #666;" onclick="showMetadata(' + idx + ')" title="メタデータ表示">📋</span>';
+        }}
+        
+        // メタデータ表示
+        async function showMetadata(idx) {{
+            try {{
+                const metadata = await window.pywebview.api.get_metadata(idx, currentSlices[idx]);
+                const popup = document.createElement('div');
+                popup.style.cssText = 'position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 2px solid #ccc; border-radius: 8px; padding: 20px; max-width: 80vw; max-height: 80vh; overflow: auto; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.3);';
+                popup.innerHTML = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;"><h3 style="margin: 0;">DICOMメタデータ</h3><button onclick="this.parentElement.parentElement.remove()" style="background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">×</button></div><pre style="font-family: monospace; font-size: 12px; margin: 0; white-space: pre-wrap;">' + metadata + '</pre>';
+                document.body.appendChild(popup);
+            }} catch (error) {{
+                alert('メタデータの取得に失敗しました: ' + error);
+            }}
         }}
         
         // 座標入力からROI更新
@@ -799,6 +813,29 @@ class DicomWebApi:
         mean = float(np.mean(roi_flat)) if roi_flat.size > 0 else 0.0
         std = float(np.std(roi_flat)) if roi_flat.size > 0 else 0.0
         return {'mean': round(mean, 8), 'std': round(std, 8)}
+
+    # Python側API: メタデータ取得
+    def get_metadata(self, series_idx, slice_idx):
+        series_idx = int(series_idx)
+        slice_idx = int(slice_idx)
+        if series_idx < len(self.all_subfolders) and slice_idx < len(self.images_list[series_idx]):
+            try:
+                # 現在のファイル名からフォルダを特定
+                current_filename = self.file_names_list[series_idx][slice_idx]
+                current_folder = None
+                for folder in self.all_subfolders[series_idx]:
+                    test_images, _, test_files = self.load_single_folder(folder)
+                    if test_files and test_files[0] == current_filename:
+                        current_folder = folder
+                        break
+                if current_folder is None:
+                    current_folder = self.all_subfolders[series_idx][0]  # フォールバック
+                
+                ds = pydicom.dcmread(current_folder + '/' + current_filename, force=True)
+                return str(ds)
+            except Exception as e:
+                return f"メタデータの読み込みに失敗しました: {e}"
+        return "メタデータがありません"
 
     # Python側API: ファイル名取得
     def get_filename(self, series_idx, slice_idx):
