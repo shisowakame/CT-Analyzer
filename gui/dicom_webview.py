@@ -60,7 +60,7 @@ HTML_TEMPLATE = '''
         .history-content {{ }}
         .history-table-block {{ max-height: 70vh; overflow-y: auto; }}
         .history-table {{ font-size: 11px; border-collapse: collapse; width: 100%; }}
-        .history-table th, .history-table td {{ border-bottom: 1px solid #eee; padding: 2px 4px; text-align: right; }}
+        .history-table th, .history-table td {{ border-bottom: 1px solid #eee; padding: 2px 4px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
         .history-table th {{ border-bottom: 1px solid #bbb; background: #f5f5f5; }}
         .delete-btn {{ background: #f44336; color: white; border: none; border-radius: 2px; padding: 1px 4px; font-size: 10px; cursor: pointer; }}
         .save-btn {{ background: #2196f3; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
@@ -200,6 +200,23 @@ HTML_TEMPLATE = '''
             let avgHtml = '';
             if (historyData.length > 0) {{
                 avgHtml += '<table class="history-table" style="background: #f4f4f4;">';
+                // ヘッダ行
+                avgHtml += '<tr>';
+                avgHtml += '<th style="width: 40px;">　</th>';
+                for (let i = 0; i < seriesCount; i++) {{
+                    avgHtml += '<th colspan="2">Folder' + (i + 1) + '</th>';
+                }}
+                avgHtml += '<th style="width: 60px;">　</th>';
+                avgHtml += '</tr>';
+                // サブヘッダ行
+                avgHtml += '<tr>';
+                avgHtml += '<th></th>';
+                for (let i = 0; i < seriesCount; i++) {{
+                    avgHtml += '<th>平均</th><th>標準偏差</th>';
+                }}
+                avgHtml += '<th></th>';
+                avgHtml += '</tr>';
+                // 平均行
                 avgHtml += '<tr style="background: #f4f4f4;">';
                 avgHtml += '<td style="font-weight: bold; text-align: center;">平均</td>';
                 for (let i = 0; i < seriesCount; i++) {{
