@@ -667,20 +667,20 @@ HTML_TEMPLATE = r'''
             // 検索機能
             const searchInput = document.getElementById('metadata-search');
             const metadataText = document.getElementById('metadata-text');
-            const originalText = metadataText.textContent;
+            const originalText = metadataText.innerText;
 
             searchInput.addEventListener('input', function() {{
                 const searchTerm = this.value.toLowerCase();
                 if (searchTerm === '') {{
-                    metadataText.textContent = originalText;
+                    metadataText.innerText = originalText;
                     return;
                 }}
-
-                const lines = originalText.split('\\n');
+                // 改行コードを正規化してsplit
+                const lines = originalText.replace(/\r\n|\r/g, '\n').split('\n');
                 const filteredLines = lines.filter(line =>
                     line.toLowerCase().includes(searchTerm)
                 );
-                metadataText.textContent = filteredLines.join('\\n');
+                metadataText.innerText = filteredLines.join('\n');
             }});
 
         }} catch (error) {{
