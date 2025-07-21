@@ -149,6 +149,8 @@ HTML_TEMPLATE = r'''
         const seriesMaxIdxList = {series_max_idx_list};
         let currentSlices = Array(seriesCount).fill(0);
         const imgs = [], sliders = [], labels = [], canvases = [], infoPanels = [], filenames = [];
+        // フォルダ1のベース名リスト
+        const seriesFolderBaseNames = {series_folder_base_names};
         
         // 履歴データ管理
         let historyData = [];
@@ -201,21 +203,21 @@ HTML_TEMPLATE = r'''
             html += '</table>';
             historyTableBlock.innerHTML = html;
 
-            // 平均行分離（Info列は空欄）
+            // 平均行分離（Info列は平均行から除外）
             let avgHtml = '';
             if (historyData.length > 0) {{
                 avgHtml += '<table class="history-table" style="background: #f4f4f4;">';
                 avgHtml += '<tr>';
                 avgHtml += '<th style="width: 40px;">　</th>';
                 for (let i = 0; i < seriesCount; i++) {{
-                    avgHtml += '<th colspan="3">Folder' + (i + 1) + '</th>';
+                    avgHtml += '<th colspan="2">Folder' + (i + 1) + '</th>';
                 }}
                 avgHtml += '<th style="width: 60px;">　</th>';
                 avgHtml += '</tr>';
                 avgHtml += '<tr>';
                 avgHtml += '<th></th>';
                 for (let i = 0; i < seriesCount; i++) {{
-                    avgHtml += '<th>平均</th><th>標準偏差</th><th>Info</th>';
+                    avgHtml += '<th>平均</th><th>標準偏差</th>';
                 }}
                 avgHtml += '<th></th>';
                 avgHtml += '</tr>';
@@ -236,7 +238,7 @@ HTML_TEMPLATE = r'''
                     }}
                     const avgMean = cnt ? (meanSum/cnt).toFixed(4) : '';
                     const avgStd = cnt ? (stdSum/cnt).toFixed(4) : '';
-                    avgHtml += '<td style="font-weight: bold;">' + avgMean + '</td><td style="font-weight: bold;">' + avgStd + '</td><td></td>';
+                    avgHtml += '<td style="font-weight: bold;">' + avgMean + '</td><td style="font-weight: bold;">' + avgStd + '</td>';
                 }}
                 avgHtml += '<td></td>';
                 avgHtml += '</tr>';
@@ -272,6 +274,10 @@ HTML_TEMPLATE = r'''
                     const folderElem = document.querySelector('[onclick="showFolderSelector(' + i + ')"]');
                     if (folderElem) {{
                         folderName = folderElem.textContent.replace(' ▼','');
+                    }}
+                    // フォルダ名が空欄の場合はseriesFolderBaseNamesから補完
+                    if (!folderName) {{
+                        folderName = seriesFolderBaseNames[i];
                     }}
                     // ファイル名
                     let fileName = filenames[i] ? filenames[i].textContent : '';
@@ -840,6 +846,8 @@ class DicomWebApi:
         ])
         col_num = min(self.series_count, 4) if self.series_count > 1 else 1
         
+        # フォルダ1のベース名リストを作成
+        series_folder_base_names = [os.path.basename(f) for f in self.dicom_folders]
         html_content = HTML_TEMPLATE.format(
             series_blocks=series_blocks,
             global_max_idx=self.global_max_idx,
@@ -847,6 +855,7 @@ class DicomWebApi:
             series_count=self.series_count,
             series_max_idx_list=self.series_max_idx_list,
             col_num=col_num,
+            series_folder_base_names=series_folder_base_names
         )
         
         return html_content
@@ -983,18 +992,48 @@ class DicomWebApi:
                 data_rows.append(flat_row)
             
             df = pd.DataFrame(data_rows, columns=columns)
+            # info列以外をfloat型に変換
+            for col in df.columns:
+                if col.startswith('Folder') and not col.endswith('Info'):
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
 
+            # --- 平均行の追加 ---
+            # 2行空白行を挿入
+            empty_row = [''] * len(columns)
+            df_blank = pd.DataFrame([empty_row, empty_row], columns=columns)
+            # 平均タイトル行（info列を除外）
+            mean_title_no_info = [col for col in columns if not col.endswith('Info')]
+            df_mean_title = pd.DataFrame([mean_title_no_info], columns=mean_title_no_info)
+            # 平均値行（info列を除外）
+            mean_values_no_info = ['']
+            for i in range(self.series_count):
+                mean_col = f'Folder{i+1} Mean'
+                std_col = f'Folder{i+1} Std Dev'
+                mean_val = df[mean_col].mean() if not df[mean_col].isnull().all() else ''
+                std_val = df[std_col].mean() if not df[std_col].isnull().all() else ''
+                mean_values_no_info.extend([
+                    round(mean_val, 4) if mean_val != '' else '',
+                    round(std_val, 4) if std_val != '' else ''
+                ])
+            df_mean_values = pd.DataFrame([mean_values_no_info], columns=mean_title_no_info)
+            # 結合
+            df_final = pd.concat([df, df_blank, df_mean_title, df_mean_values], ignore_index=True)
+            
             # 現在の日時を取得し、ファイル名を生成
             now = datetime.datetime.now()
             # YYYYMMDD_HHMMSS の形式でフォーマット
             timestamp = now.strftime("%Y%m%d_%H%M%S") 
             file_name = f"ROI-history-{timestamp}.xlsx"
             
+            # スクリプトが実行されているディレクトリに保存
+            #script_dir = os.path.dirname(os.path.abspath(__file__))
+            #file_path = os.path.join(script_dir, file_name)
+            
             # ダウンロードフォルダに保存
             downloads_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
             file_path = os.path.join(downloads_dir, file_name)
 
-            df.to_excel(file_path, index=False, engine='openpyxl')
+            df_final.to_excel(file_path, index=False, engine='openpyxl')
             
             return {'success': True, 'filePath': file_path}
         except Exception as e:
