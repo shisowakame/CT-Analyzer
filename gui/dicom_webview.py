@@ -282,7 +282,7 @@ HTML_TEMPLATE = r'''
 
         const contentHtml = `
             <div style="flex: 1; overflow: auto; border: 1px solid #eee; border-radius: 4px; padding: 10px; background: #f9f9f9;">
-                <pre style="font-family: monospace; font-size: 12px; margin: 0; white-space: pre-wrap;">` + infoText + `</pre>
+                <pre style="font-family: monospace; font-size: 12px; margin: 0; white-space: pre-wrap;">` + infoText.replace('/ROIの基準座標:', '<br>/ROIの基準座標:') + `</pre>
             </div>
         `;
 
@@ -340,7 +340,9 @@ HTML_TEMPLATE = r'''
                 if (roiCoords[i]) {{
                     coord = '(' + roiCoords[i].x + ',' + roiCoords[i].y + ')';
                 }}
-                info = folderName + '/' + fileName + '/' + coord;
+                // ROIサイズ
+                let roiSize = roiW + 'x' + roiH;
+                info = folderName + '/' + fileName + '/ROIの基準座標:' + coord + '/ROIsize:' + roiSize;
             }}
             row.push({{mean: mean, std: std, info: info}});
         }}
