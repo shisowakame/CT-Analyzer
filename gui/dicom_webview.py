@@ -6,8 +6,11 @@ import numpy as np
 import pydicom
 from PIL import Image
 import webview
+import pandas as pd
+import datetime # datetimeモジュールを追加
 
-HTML_TEMPLATE = '''
+
+HTML_TEMPLATE = r'''
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -65,6 +68,7 @@ HTML_TEMPLATE = '''
         .delete-btn {{ background: #f44336; color: white; border: none; border-radius: 2px; padding: 1px 4px; font-size: 10px; cursor: pointer; }}
         .save-btn {{ background: #2196f3; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
         .reset-btn {{ background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
+        .export-excel-btn {{ background: #1a7340; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }} /* 新しいスタイル */
         .info-text {{ font-size: 11px; color: #888; margin-top: 8px; }}
         h2 {{ margin-top: 0; font-size: clamp(1rem, 1.7vw, 1.2rem); }}
         #toolbar span:first-child {{ margin-left: 10px; }}
@@ -128,6 +132,7 @@ HTML_TEMPLATE = '''
                     <div class="history-controls">
                         <button id="save-btn" class="save-btn">保存</button>
                         <button id="reset-btn" class="reset-btn">リセット</button>
+                        <button id="export-excel-btn" class="export-excel-btn">Excelエクスポート</button>
                     </div>
                 </div>
                 <div class="history-content">
@@ -150,6 +155,7 @@ HTML_TEMPLATE = '''
         const historyTableBlock = document.getElementById('history-table-block');
         const saveBtn = document.getElementById('save-btn');
         const resetBtn = document.getElementById('reset-btn');
+        const exportExcelBtn = document.getElementById('export-excel-btn');
         
         for (let i = 0; i < seriesCount; i++) {{
             imgs.push(document.getElementById('dicom-img-' + i));
@@ -165,19 +171,17 @@ HTML_TEMPLATE = '''
             let html = '<table class="history-table">';
             // ヘッダ行
             html += '<tr>';
-            //html += '<th style="width: 40px;">番号</th>';
             html += '<th style="width: 40px;"> </th>';
             for (let i = 0; i < seriesCount; i++) {{
-                html += '<th colspan="2">Folder' + (i + 1) + '</th>';
+                html += '<th colspan="3">Folder' + (i + 1) + '</th>';
             }}
-            //html += '<th style="width: 60px;">操作</th>';
             html += '<th style="width: 60px;"> </th>';
             html += '</tr>';
             // サブヘッダ行
             html += '<tr>';
             html += '<th></th>';
             for (let i = 0; i < seriesCount; i++) {{
-                html += '<th>平均</th><th>標準偏差</th>';
+                html += '<th>平均</th><th>標準偏差</th><th>Info</th>';
             }}
             html += '<th></th>';
             html += '</tr>';
@@ -188,7 +192,8 @@ HTML_TEMPLATE = '''
                 for (let i = 0; i < seriesCount; i++) {{
                     const meanVal = historyData[r][i] && historyData[r][i].mean ? historyData[r][i].mean : '';
                     const stdVal = historyData[r][i] && historyData[r][i].std ? historyData[r][i].std : '';
-                    html += '<td>' + meanVal + '</td><td>' + stdVal + '</td>';
+                    const infoVal = historyData[r][i] && historyData[r][i].info ? historyData[r][i].info : '';
+                    html += '<td>' + meanVal + '</td><td>' + stdVal + '</td><td>' + infoVal + '</td>';
                 }}
                 html += '<td style="text-align: center;"><button onclick="deleteHistoryRow(' + r + ')" class="delete-btn">×</button></td>';
                 html += '</tr>';
@@ -196,27 +201,24 @@ HTML_TEMPLATE = '''
             html += '</table>';
             historyTableBlock.innerHTML = html;
 
-            // 平均行分離
+            // 平均行分離（Info列は空欄）
             let avgHtml = '';
             if (historyData.length > 0) {{
                 avgHtml += '<table class="history-table" style="background: #f4f4f4;">';
-                // ヘッダ行
                 avgHtml += '<tr>';
                 avgHtml += '<th style="width: 40px;">　</th>';
                 for (let i = 0; i < seriesCount; i++) {{
-                    avgHtml += '<th colspan="2">Folder' + (i + 1) + '</th>';
+                    avgHtml += '<th colspan="3">Folder' + (i + 1) + '</th>';
                 }}
                 avgHtml += '<th style="width: 60px;">　</th>';
                 avgHtml += '</tr>';
-                // サブヘッダ行
                 avgHtml += '<tr>';
                 avgHtml += '<th></th>';
                 for (let i = 0; i < seriesCount; i++) {{
-                    avgHtml += '<th>平均</th><th>標準偏差</th>';
+                    avgHtml += '<th>平均</th><th>標準偏差</th><th>Info</th>';
                 }}
                 avgHtml += '<th></th>';
                 avgHtml += '</tr>';
-                // 平均行
                 avgHtml += '<tr style="background: #f4f4f4;">';
                 avgHtml += '<td style="font-weight: bold; text-align: center;">平均</td>';
                 for (let i = 0; i < seriesCount; i++) {{
@@ -234,7 +236,7 @@ HTML_TEMPLATE = '''
                     }}
                     const avgMean = cnt ? (meanSum/cnt).toFixed(4) : '';
                     const avgStd = cnt ? (stdSum/cnt).toFixed(4) : '';
-                    avgHtml += '<td style="font-weight: bold;">' + avgMean + '</td><td style="font-weight: bold;">' + avgStd + '</td>';
+                    avgHtml += '<td style="font-weight: bold;">' + avgMean + '</td><td style="font-weight: bold;">' + avgStd + '</td><td></td>';
                 }}
                 avgHtml += '<td></td>';
                 avgHtml += '</tr>';
@@ -257,14 +259,30 @@ HTML_TEMPLATE = '''
             for (let i = 0; i < seriesCount; i++) {{
                 let mean = '';
                 let std = '';
+                let info = '';
                 if (roiCoords[i]) {{
-                    const info = infoPanels[i].innerText;
-                    const m = info.match(/平均: ([\\d\\.-]+)/);
-                    const s = info.match(/標準偏差: ([\\d\\.-]+)/);
+                    const infoPanel = infoPanels[i];
+                    const infoText = infoPanel.innerText;
+                    const m = infoText.match(/平均: ([\d\.-]+)/);
+                    const s = infoText.match(/標準偏差: ([\d\.-]+)/);
                     mean = m ? m[1] : '';
                     std = s ? s[1] : '';
+                    // フォルダ名
+                    let folderName = '';
+                    const folderElem = document.querySelector('[onclick="showFolderSelector(' + i + ')"]');
+                    if (folderElem) {{
+                        folderName = folderElem.textContent.replace(' ▼','');
+                    }}
+                    // ファイル名
+                    let fileName = filenames[i] ? filenames[i].textContent : '';
+                    // 座標
+                    let coord = '';
+                    if (roiCoords[i]) {{
+                        coord = '(' + roiCoords[i].x + ',' + roiCoords[i].y + ')';
+                    }}
+                    info = folderName + '/' + fileName + '/' + coord;
                 }}
-                row.push({{mean: mean, std: std}});
+                row.push({{mean: mean, std: std, info: info}});
             }}
             return row;
         }}
@@ -279,6 +297,25 @@ HTML_TEMPLATE = '''
         resetBtn.addEventListener('click', function() {{
             historyData = [];
             renderHistoryTable();
+        }});
+
+        // Excelエクスポートボタンのイベントリスナー
+        exportExcelBtn.addEventListener('click', async function() {{
+            if (historyData.length === 0) {{
+                alert('エクスポートする履歴データがありません。');
+                return;
+            }}
+            try {{
+                const result = await window.pywebview.api.export_history_to_excel(historyData);
+                if (result.success) {{
+                    alert('履歴がExcelファイルとして保存されました:\\n' + result.filePath);
+                }} else {{
+                    alert('Excelファイルの保存に失敗しました:\\n' + result.message);
+                }}
+            }} catch (error) {{
+                console.error('Excelエクスポートエラー:', error);
+                alert('Excelファイルの保存中にエラーが発生しました。');
+            }}
         }});
         
         // ROIサイズ管理
@@ -584,8 +621,6 @@ HTML_TEMPLATE = '''
                     metadataText.textContent = filteredLines.join('\\n');
                 }});
                 
-
-                
             }} catch (error) {{
                 alert('メタデータの取得に失敗しました: ' + error);
             }}
@@ -805,22 +840,6 @@ class DicomWebApi:
         ])
         col_num = min(self.series_count, 4) if self.series_count > 1 else 1
         
-        # 履歴ポップアップHTML
-        history_popup_html = '''
-    <div id="history-popup" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.25); z-index:2000; align-items:center; justify-content:center;">
-      <div id="history-content" style="background:white; border-radius:8px; padding:24px 18px 18px 18px; min-width:480px; min-height:200px; max-width:90vw; max-height:80vh; overflow:auto; box-shadow:0 4px 24px rgba(0,0,0,0.18); position:relative;">
-        <button id="close-history-btn" style="position:absolute; top:8px; right:8px; background:#eee; border:none; border-radius:4px; font-size:14px; cursor:pointer;">×</button>
-        <h3 style="font-size:14px; margin:0 0 8px 0;">ROI統計履歴</h3>
-        <div id="history-table-block"></div>
-        <div style="margin-top:10px; display:flex; gap:8px;">
-          <button id="save-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#2196f3; color:white; cursor:pointer;">保存</button>
-          <button id="reset-history-btn" style="font-size:12px; padding:4px 10px; border-radius:4px; border:none; background:#f44336; color:white; cursor:pointer;">リセット</button>
-        </div>
-        <div style="font-size:11px; color:#888; margin-top:6px;">Ctrl+Sでも保存できます</div>
-      </div>
-    </div>'''
-        
-        # HTMLテンプレートに履歴ポップアップを動的に挿入
         html_content = HTML_TEMPLATE.format(
             series_blocks=series_blocks,
             global_max_idx=self.global_max_idx,
@@ -828,7 +847,6 @@ class DicomWebApi:
             series_count=self.series_count,
             series_max_idx_list=self.series_max_idx_list,
             col_num=col_num,
-            history_popup=history_popup_html
         )
         
         return html_content
@@ -887,7 +905,7 @@ class DicomWebApi:
                 if current_folder is None:
                     current_folder = self.all_subfolders[series_idx][0]  # フォールバック
                 
-                ds = pydicom.dcmread(current_folder + '/' + current_filename, force=True)
+                ds = pydicom.dcmread(os.path.join(current_folder, current_filename), force=True)
                 return str(ds)
             except Exception as e:
                 return f"メタデータの読み込みに失敗しました: {e}"
@@ -950,6 +968,39 @@ class DicomWebApi:
             return self.folder_types[series_idx]
         return "folder1"
 
+    def export_history_to_excel(self, history_data):
+        try:
+            # DataFrameの準備
+            columns = ['No.']
+            for i in range(self.series_count):
+                columns.extend([f'Folder{i+1} Mean', f'Folder{i+1} Std Dev', f'Folder{i+1} Info'])
+            
+            data_rows = []
+            for r_idx, row_data in enumerate(history_data):
+                flat_row = [r_idx + 1]
+                for series_stat in row_data:
+                    flat_row.extend([series_stat.get('mean', ''), series_stat.get('std', ''), series_stat.get('info', '')])
+                data_rows.append(flat_row)
+            
+            df = pd.DataFrame(data_rows, columns=columns)
+
+            # 現在の日時を取得し、ファイル名を生成
+            now = datetime.datetime.now()
+            # YYYYMMDD_HHMMSS の形式でフォーマット
+            timestamp = now.strftime("%Y%m%d_%H%M%S") 
+            file_name = f"ROI-history-{timestamp}.xlsx"
+            
+            # ダウンロードフォルダに保存
+            downloads_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
+            file_path = os.path.join(downloads_dir, file_name)
+
+            df.to_excel(file_path, index=False, engine='openpyxl')
+            
+            return {'success': True, 'filePath': file_path}
+        except Exception as e:
+            # エラーの詳細をメッセージに含める
+            return {'success': False, 'message': f"ファイルの保存中にエラーが発生しました: {str(e)}"}
+
 if __name__ == '__main__':
     import sys
     if len(sys.argv) < 2:
@@ -959,4 +1010,4 @@ if __name__ == '__main__':
     api = DicomWebApi(folders)
     html = api.get_init_html()
     window = webview.create_window('DICOM Web Viewer (Multi-Series)', html=html, js_api=api, width=1200, height=900)
-    webview.start(debug=False) 
+    webview.start(debug=False)
