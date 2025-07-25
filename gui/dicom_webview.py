@@ -16,15 +16,26 @@ HTML_TEMPLATE = r'''
 <head>
     <meta charset="UTF-8">
     <title>DICOM Web Viewer (Multi-Series)</title>
+    <!-- FontAwesome CDN追加 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
     <style>
-        body {{ font-family: sans-serif; margin: 20px; }}
+        body {{ font-family: sans-serif; margin: 20px; background: #f7f9fb; }}
         .main-container {{ display: flex; gap: 20px; align-items: flex-start; width: 100vw; box-sizing: border-box; }}
         .left-panel {{ flex: 0 0 66.66vw; width: 66.66vw; }}
         .right-panel {{ flex: 0 0 33.33vw; min-width: 300px; margin-top: 0px; width: 33.33vw; }}
-        #toolbar {{ margin-bottom: 16px; padding: 8px 0; background: #f0f0f0; border-radius: 6px; display: flex; align-items: center; gap: 10px; }}
-        #toolbar label {{ margin-right: 4px; }}
-        #toolbar input[type='number'] {{ width: 48px; }}
-        #toolbar button.preset {{ margin-left: 2px; }}
+        #toolbar {{
+            width: var(--dicom-grid-width);
+            margin-left: 25px;
+            margin-bottom: 16px;
+            padding: 8px 0;
+            background: #f0f0f0;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }}
+        .toolbar-label-text {{ display: flex; align-items: center; gap: 6px; font-weight: normal; }}
         #grid {{
             width: 66.66vw;
             margin-left: 25px;
@@ -32,8 +43,8 @@ HTML_TEMPLATE = r'''
             grid-template-columns: repeat({col_num}, 1fr);
             gap: 20px;
         }}
-        .series-block {{ width: 100%; }}
-        .dicom-square {{ aspect-ratio: 1/1; width: 100%; position: relative; }}
+        .series-block {{ width: 100%; box-shadow: 0 2px 8px rgba(0,0,0,0.07); border-radius: 8px; background: #fff; padding: 8px 0 12px 0; }}
+        .dicom-square {{ aspect-ratio: 1/1; width: 100%; position: relative; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }}
         .dicom-img, .roi-canvas {{
             position: absolute;
             top: 0; left: 0;
@@ -50,27 +61,30 @@ HTML_TEMPLATE = r'''
         .series-block {{ display: flex; flex-direction: column; align-items: center; position: relative; }}
         .dicom-img {{ display: block; position: relative; z-index: 1; }}
         .roi-canvas {{ position: absolute; left: 0; top: 0; z-index: 2; pointer-events: auto; }}
-        .slider {{ width: 20vw; }}
+        .slider {{ width: 20vw; accent-color: #1976d2; }}
         #global-slider-block {{ margin-top: 20px; text-align: center; }}
-        #global-slider {{ width: 40vw; }}
-        .info-panel {{ margin-top: 5px; font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px; min-width: 200px; }}
-        
+        #global-slider {{ width: 40vw; accent-color: #1976d2; }}
+        .info-panel {{ margin-top: 5px; font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px; min-width: 200px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }}
+        .series-block > div[style*='font-weight: bold'] {{ display: flex; align-items: center; gap: 6px; }}
         /* 履歴パネル用スタイル */
-        .history-panel {{ background: #f9f9f9; border: 1px solid #ddd; border-radius: 6px; padding: 12px; }}
+        .history-panel {{ background: #f9f9f9; border: 1px solid #ddd; border-radius: 10px; padding: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.07); }}
         .history-header {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }}
-        .history-header h3 {{ margin: 0; font-size: 14px; color: #333; }}
+        .history-header h3 {{ margin: 0; font-size: 15px; color: #333; display: flex; align-items: center; gap: 6px; }}
         .history-controls {{ display: flex; gap: 8px; }}
-        .history-content {{ }}
         .history-table-block {{ max-height: 70vh; overflow-y: auto; }}
-        .history-table {{ font-size: 11px; border-collapse: collapse; width: 100%; }}
+        .history-table {{ font-size: 11px; border-collapse: collapse; width: 100%; background: #fff; border-radius: 6px; overflow: hidden; }}
         .history-table th, .history-table td {{ border-bottom: 1px solid #eee; padding: 2px 4px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
         .history-table th {{ border-bottom: 1px solid #bbb; background: #f5f5f5; }}
-        .delete-btn {{ background: #f44336; color: white; border: none; border-radius: 2px; padding: 1px 4px; font-size: 10px; cursor: pointer; }}
-        .save-btn {{ background: #2196f3; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
-        .reset-btn {{ background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }}
-        .export-excel-btn {{ background: #1a7340; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; }} /* 新しいスタイル */
+        .delete-btn {{ background: #f44336; color: white; border: none; border-radius: 2px; padding: 1px 4px; font-size: 10px; cursor: pointer; transition: background 0.2s; }}
+        .delete-btn:hover {{ background: #b71c1c; }}
+        .save-btn {{ background: #2196f3; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; box-shadow: 0 1px 4px rgba(33,150,243,0.08); transition: background 0.2s; }}
+        .save-btn:hover {{ background: #1769aa; }}
+        .reset-btn {{ background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; box-shadow: 0 1px 4px rgba(244,67,54,0.08); transition: background 0.2s; }}
+        .reset-btn:hover {{ background: #b71c1c; }}
+        .export-excel-btn {{ background: #1a7340; color: white; border: none; border-radius: 4px; padding: 4px 10px; font-size: 12px; cursor: pointer; box-shadow: 0 1px 4px rgba(26,115,64,0.08); transition: background 0.2s; }}
+        .export-excel-btn:hover {{ background: #14532d; }}
         .info-text {{ font-size: 11px; color: #888; margin-top: 8px; }}
-        h2 {{ margin-top: 0; font-size: clamp(1rem, 1.7vw, 1.2rem); }}
+        h2 {{ margin-top: 0; font-size: clamp(1rem, 1.7vw, 1.2rem); display: flex; align-items: center; gap: 8px; }}
         #toolbar span:first-child {{ margin-left: 10px; }}
         .right-panel {{ flex: 0 0 30vw; min-width: 300px; margin-top: 0px; width: 30vw; }}
         #history-avg-row-block {{ max-width: 30vw; width: 100%; overflow-x: auto; }}
@@ -82,64 +96,66 @@ HTML_TEMPLATE = r'''
             grid-template-columns: repeat({col_num}, 1fr);
             gap: 20px;
         }}
-        #toolbar {{
-            width: var(--dicom-grid-width);
-            margin-left: 25px;
-            margin-bottom: 16px;
-            padding: 8px 0;
-            background: #f0f0f0;
-            border-radius: 6px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }}
+        /* ボタン共通 */
+        button {{ transition: box-shadow 0.2s, background 0.2s; }}
+        button:active {{ box-shadow: 0 2px 8px rgba(33,150,243,0.12) inset; }}
     </style>
 </head>
 <body>
     <div class="main-container" style="display: flex; gap: 20px; align-items: flex-start;">
         <div class="left-panel">
-            <h2>DICOM Web Viewer (Multi-Series)</h2>
-            <div id="toolbar">
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <span>モード:</span>
-                    <div style="display: flex; align-items: center; background: #e0e0e0; border-radius: 20px; padding: 2px; position: relative;">
-                        <button id="sync-mode-btn" style="border: none; background: #4CAF50; color: white; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">同期</button>
-                        <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">独立</button>
+            <h2><i class="fa-solid fa-x-ray"></i> DICOM Web Viewer (Multi-Series)</h2>
+            <div id="toolbar" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
+                <div class="toolbar-row1" style="display: flex; flex-direction: row; align-items: center; gap: 0; width: 100%;">
+                    <div class="toolbar-label" style="min-width: 90px; display: flex; align-items: center;">
+                        <label class="toolbar-label-text"><i class="fa-solid fa-layer-group"></i> モード:</label>
+                    </div>
+                    <div class="toolbar-controls" style="display: flex; align-items: center; gap: 10px;">
+                        <div style="display: flex; align-items: center; background: #e0e0e0; border-radius: 20px; padding: 2px; position: relative;">
+                            <button id="sync-mode-btn" style="border: none; background: #4CAF50; color: white; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-link"></i> 同期</button>
+                            <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-unlink"></i> 独立</button>
+                        </div>
+                        <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-eraser"></i> リセット</button>
                     </div>
                 </div>
-                <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">リセット</button>
-                <label>サイズ:</label>
-                <input type="number" id="roi-width" min="3" max="200" value="10"> ×
-                <input type="number" id="roi-height" min="3" max="200" value="10">
-                <span>プリセット:</span>
-                <button class="preset" data-w="5" data-h="5">5×5</button>
-                <button class="preset" data-w="10" data-h="10">10×10</button>
-                <button class="preset" data-w="20" data-h="20">20×20</button>
-                <button class="preset" data-w="50" data-h="50">50×50</button>
+                <div class="toolbar-row2" style="display: flex; flex-direction: row; align-items: center; gap: 0; width: 100%;">
+                    <div class="toolbar-label" style="min-width: 90px; display: flex; align-items: center;">
+                        <label class="toolbar-label-text"><i class="fa-solid fa-expand-arrows-alt"></i> サイズ:</label>
+                    </div>
+                    <div class="toolbar-controls" style="display: flex; align-items: center; gap: 10px;">
+                        <input type="number" id="roi-width" min="3" max="200" value="10"> ×
+                        <input type="number" id="roi-height" min="3" max="200" value="10">
+                        <span><i class="fa-solid fa-bolt"></i> プリセット:</span>
+                        <button class="preset" data-w="5" data-h="5"><i class="fa-regular fa-square"></i> 5×5</button>
+                        <button class="preset" data-w="10" data-h="10"><i class="fa-regular fa-square"></i> 10×10</button>
+                        <button class="preset" data-w="20" data-h="20"><i class="fa-regular fa-square"></i> 20×20</button>
+                        <button class="preset" data-w="50" data-h="50"><i class="fa-regular fa-square"></i> 50×50</button>
+                    </div>
+                </div>
             </div>
             <div id="grid">
                 {series_blocks}
             </div>
             <div id="global-slider-block">
                 <input type="range" id="global-slider" min="0" max="{global_max_idx}" value="0" />
-                <span id="global-slice-label">Slice: 1/{global_max_idx_plus1}</span>
+                <span id="global-slice-label"><i class="fa-solid fa-layer-group"></i> Slice: 1/{global_max_idx_plus1}</span>
             </div>
         </div>
         <div class="right-panel">
             <div class="history-panel">
                 <div class="history-header">
-                    <h3>ROI統計履歴</h3>
+                    <h3><i class="fa-solid fa-clock-rotate-left"></i> ROI統計履歴</h3>
                     <div class="history-controls">
-                        <button id="save-btn" class="save-btn">保存</button>
-                        <button id="reset-btn" class="reset-btn">リセット</button>
-                        <button id="export-excel-btn" class="export-excel-btn">Excelエクスポート</button>
+                        <button id="save-btn" class="save-btn"><i class="fa-solid fa-floppy-disk"></i> 保存</button>
+                        <button id="reset-btn" class="reset-btn"><i class="fa-solid fa-trash"></i> リセット</button>
+                        <button id="export-excel-btn" class="export-excel-btn"><i class="fa-solid fa-file-excel"></i> Excelエクスポート</button>
                     </div>
                 </div>
                 <div class="history-content">
                     <div id="history-table-block" class="history-table-block"></div>
                     <div id="history-avg-row-block"></div>
                 </div>
-                <div class="info-text">Ctrl+Sでも保存できます</div>
+                <div class="info-text"><i class="fa-solid fa-keyboard"></i> Ctrl+Sでも保存できます</div>
             </div>
         </div>
     </div>
@@ -197,7 +213,9 @@ HTML_TEMPLATE = r'''
                 const infoVal = historyData[r][i] && historyData[r][i].info ? historyData[r][i].info : '';
                 // infoセルは▽ボタンのみ表示、押すとポップアップ
                 html += '<td>' + meanVal + '</td><td>' + stdVal + '</td>' +
-                    '<td style="text-align:center;"><button class="info-popup-btn" data-info="' + encodeURIComponent(infoVal) + '" style="background:none;border:none;cursor:pointer;font-size:16px;">&#9660;</button></td>';
+                    '<td style="text-align:center;"><button class="info-popup-btn" data-info="' + encodeURIComponent(infoVal) + '" style="background:none;border:none;cursor:pointer;font-size:16px;">'
+                    + '<i class="fa-solid fa-circle-info" style="color:#1976d2;"></i>'
+                    + '</button></td>';
             }}
             html += '<td style="text-align: center;"><button onclick="deleteHistoryRow(' + r + ')" class="delete-btn">×</button></td>';
             html += '</tr>';
@@ -481,7 +499,7 @@ HTML_TEMPLATE = r'''
                 div.onmouseout = function() {{ this.style.backgroundColor = 'white'; }};
                 div.onclick = function() {{
                     selectFolder(seriesIdx, idx);
-                    selector.style.display = 'none';
+                    selector.style.display = 'block';
                 }};
                 selector.appendChild(div);
             }});
@@ -632,8 +650,7 @@ HTML_TEMPLATE = r'''
         infoPanels[idx].innerHTML = '画像サイズ: ' + img.naturalWidth + 'x' + img.naturalHeight + '<br>ROI: [' +
             '<input type="number" id="roi-x-' + idx + '" value="' + x + '" style="width: 50px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">,' +
             '<input type="number" id="roi-y-' + idx + '" value="' + y + '" style="width: 50px; text-align: center;" onchange="updateROIFromInput(' + idx + ')">] ' + roiW + 'x' + roiH +
-            '<br>平均: ' + stats.mean + '<br>標準偏差: ' + stats.std +
-            '<span style="position: absolute; bottom: 2px; right: 2px; cursor: pointer; font-size: 12px; color: #666;" onclick="showMetadata(' + idx + ')" title="メタデータ表示">📋</span>';
+            '<br>平均: ' + stats.mean + '<br>標準偏差: ' + stats.std;
     }}
 
     // メタデータ表示
@@ -647,7 +664,7 @@ HTML_TEMPLATE = r'''
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; flex-shrink: 0;">
                     <h3 style="margin: 0;">DICOMメタデータ</h3>
                     <div style="display: flex; gap: 8px;">
-                        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;">×</button>
+                        <button onclick="this.parentElement.parentElement.parentElement.remove()" style="background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer;"><i class="fa-solid fa-xmark"></i></button>
                     </div>
                 </div>
                 <div style="margin-bottom: 10px; flex-shrink: 0;">
@@ -896,7 +913,15 @@ class DicomWebApi:
             + f'</div>'
             + f'<div class="info-panel" id="info-panel-{i}"></div>'
             + f'<input type="range" class="slider" id="slider-{i}" min="0" max="{self.series_max_idx_list[i]}" value="0" />'
-            + f'<div style="display: flex; gap: 5px; margin-top: 5px;"><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="slice-label-{i}" style="font-weight: bold;">Slice: 1/{self.series_max_idx_list[i] + 1}</span></div><div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="filename-{i}">{self.file_names_list[i][0] if len(self.file_names_list[i]) > 0 else ""}</span></div></div>'
+            + f'<div style="display: flex; gap: 5px; margin-top: 5px; align-items: center;">'
+            + f'<div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px; display: flex; align-items: center;">'
+            + f'<span id="filename-{i}" style="display: inline-block; vertical-align: middle;">{self.file_names_list[i][0] if len(self.file_names_list[i]) > 0 else ""}</span>'
+            + f'<button onclick="showMetadata({i})" title="メタデータ表示" style="background: none; border: none; padding: 0 0 0 6px; margin: 0; cursor: pointer; vertical-align: middle; height: 100%; display: flex; align-items: center;">'
+            + f'<i class="fa-solid fa-circle-info" style="color: #1976d2; font-size: 1.2em;"></i>'
+            + f'</button>'
+            + f'</div>'
+            + f'<div style="font-size: 12px; color: #222; background: #f4f4f4; border-radius: 4px; padding: 4px 8px;"><span id="slice-label-{i}" style="font-weight: bold;">Slice: 1/{self.series_max_idx_list[i] + 1}</span></div>'
+            + f'</div>'
             + f'</div>'
             for i, b64 in enumerate(b64list)
         ])
