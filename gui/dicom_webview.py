@@ -104,7 +104,7 @@ HTML_TEMPLATE = r'''
 <body>
     <div class="main-container" style="display: flex; gap: 20px; align-items: flex-start;">
         <div class="left-panel">
-            <h2><i class="fa-solid fa-x-ray"></i> DICOM Web Viewer (Multi-Series)</h2>
+            <h2>DICOM Web Viewer (Multi-Series)<i class="fa-solid fa-x-ray"></i> </h2>
             <div id="toolbar" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
                 <div class="toolbar-row1" style="display: flex; flex-direction: row; align-items: center; gap: 0; width: 100%;">
                     <div class="toolbar-label" style="min-width: 90px; display: flex; align-items: center;">
@@ -116,6 +116,9 @@ HTML_TEMPLATE = r'''
                             <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-unlink"></i> 独立</button>
                         </div>
                         <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-eraser"></i> リセット</button>
+                        <!-- 諧調揃えボタン追加（ここから） -->
+                        <button id="match-contrast-btn" style="border: none; background: #ff9800; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">諧調揃え: OFF</button>
+                        <!-- 諧調揃えボタン追加（ここまで） -->
                     </div>
                 </div>
                 <div class="toolbar-row2" style="display: flex; flex-direction: row; align-items: center; gap: 0; width: 100%;">
@@ -126,10 +129,10 @@ HTML_TEMPLATE = r'''
                         <input type="number" id="roi-width" min="3" max="200" value="10"> ×
                         <input type="number" id="roi-height" min="3" max="200" value="10">
                         <span><i class="fa-solid fa-bolt"></i> プリセット:</span>
-                        <button class="preset" data-w="5" data-h="5"><i class="fa-regular fa-square"></i> 5×5</button>
-                        <button class="preset" data-w="10" data-h="10"><i class="fa-regular fa-square"></i> 10×10</button>
-                        <button class="preset" data-w="20" data-h="20"><i class="fa-regular fa-square"></i> 20×20</button>
-                        <button class="preset" data-w="50" data-h="50"><i class="fa-regular fa-square"></i> 50×50</button>
+                        <button class="preset" data-w="5" data-h="5">5×5</button>
+                        <button class="preset" data-w="10" data-h="10">10×10</button>
+                        <button class="preset" data-w="20" data-h="20">20×20</button>
+                        <button class="preset" data-w="50" data-h="50">50×50</button>
                     </div>
                 </div>
             </div>
@@ -474,6 +477,22 @@ HTML_TEMPLATE = r'''
         }}
     }});
 
+    // 諧調揃えボタン状態
+    let matchContrastEnabled = false;
+    const matchContrastBtn = document.getElementById('match-contrast-btn');
+    matchContrastBtn.addEventListener('click', async function() {{
+        matchContrastEnabled = !matchContrastEnabled;
+        matchContrastBtn.textContent = '諧調揃え: ' + (matchContrastEnabled ? 'ON' : 'OFF');
+        // Python側API呼び出し（プレースホルダ）
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_match_contrast_enabled) {{
+            await window.pywebview.api.set_match_contrast_enabled(matchContrastEnabled);
+        }}
+        // 画像再描画（プレースホルダ）
+        if (typeof redrawAllImages === 'function') {{
+            redrawAllImages();
+        }}
+    }});
+
     updateModeButtons();
 
     // フォルダ選択機能
@@ -514,35 +533,31 @@ HTML_TEMPLATE = r'''
         if (result.success) {{
             const b64 = await window.pywebview.api.get_single_slice(seriesIdx, 0);
             imgs[seriesIdx].src = 'data:image/png;base64,' + b64;
-
             sliders[seriesIdx].value = 0;
             sliders[seriesIdx].max = result.max_idx;
             currentSlices[seriesIdx] = 0;
             labels[seriesIdx].textContent = 'Slice: 1/' + (result.max_idx + 1);
-
             const filename = await window.pywebview.api.get_filename(seriesIdx, 0);
             filenames[seriesIdx].textContent = filename;
-
             drawROI(seriesIdx);
             updateStats(seriesIdx);
-
             const folderName = await window.pywebview.api.get_current_folder_name(seriesIdx);
             const folderElement = document.querySelector('[onclick="showFolderSelector(' + seriesIdx + ')"]');
             folderElement.textContent = folderName + ' ▼';
-
             // 全体シークバーの分母を更新
             const globalMaxIdx = Math.min(...Array.from({{length: seriesCount}}, (_, i) => parseInt(sliders[i].max)));
             const oldGlobalMax = parseInt(globalSlider.max);
             globalSlider.max = globalMaxIdx;
-
-            // 最小値に変更があった場合のみ位置をリセット
             if (globalMaxIdx < oldGlobalMax) {{
                 globalSlider.value = 0;
                 globalLabel.textContent = 'Slice: 1/' + (globalMaxIdx + 1);
             }} else {{
-                // 位置はそのまま、ラベルのみ更新
                 const currentValue = parseInt(globalSlider.value);
                 globalLabel.textContent = 'Slice: ' + (currentValue + 1) + '/' + (globalMaxIdx + 1);
+            }}
+            // 諧調揃えONなら全画像再描画
+            if (result.match_contrast_enabled) {{
+                redrawAllImages();
             }}
         }}
     }}
@@ -797,6 +812,27 @@ HTML_TEMPLATE = r'''
         }}
     }});
 
+    // redrawAllImages: 諧調揃えON/OFFやフォルダ切替時に全画像を再描画
+    function redrawAllImages() {{
+        for (let i = 0; i < seriesCount; i++) {{
+            (async function(idx) {{
+                const sliceIdx = currentSlices[idx];
+                const b64 = await window.pywebview.api.get_single_slice(idx, sliceIdx);
+                imgs[idx].src = 'data:image/png;base64,' + b64;
+                setTimeout(() => {{
+                    const img = imgs[idx];
+                    const canvas = canvases[idx];
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    canvas.style.left = img.offsetLeft + 'px';
+                    canvas.style.top = img.offsetTop + 'px';
+                    drawROI(idx);
+                    updateStats(idx);
+                }}, 50);
+            }})(i);
+        }}
+    }}
+
     // 初期履歴テーブル表示
     renderHistoryTable();
 </script>
@@ -811,6 +847,8 @@ class DicomWebApi:
         self.series_count = len(self.images_list)
         self.series_max_idx_list = [len(images) - 1 for images in self.images_list]
         self.global_max_idx = min(self.series_max_idx_list) if self.series_count > 0 else 0
+        # 諧調揃え状態
+        self.match_contrast_enabled = False
 
     def load_all_folders(self, folders):
         all_images = []
@@ -876,7 +914,42 @@ class DicomWebApi:
         arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-8) * 255.0
         return arr.astype(np.uint8)
 
+    def get_min_ct_window(self):
+        # 各画像のmin, max, 幅を計算し、最小幅の画像のmin, maxを基準にする
+        min_base = None
+        min_range = None
+        min_width = None
+        for series in self.original_images_list:
+            for arr in series:
+                arr_min = np.min(arr)
+                arr_max = np.max(arr)
+                width = arr_max - arr_min
+                if min_width is None or width < min_width:
+                    min_width = width
+                    min_base = arr_min
+                    min_range = width
+        # min_base: 最小幅画像のmin, min_range: その幅
+        # 幅が0の場合は1にする（ゼロ除算防止）
+        if min_range == 0:
+            min_range = 1
+        return min_base, min_range
+
     def get_png_b64(self, arr):
+        # arrは必ず生CT値（float, pixel_array+RescaleIntercept）であること
+        arr_min = float(np.min(arr))
+        arr_max = float(np.max(arr))
+        arr_width = arr_max - arr_min
+        if getattr(self, 'match_contrast_enabled', False):
+            base, ct_range = self.get_min_ct_window()
+            arr_disp = np.clip((arr - base) / ct_range, 0, 1)
+            arr_disp_uint8 = (arr_disp * 255.0).astype(np.uint8)
+            print(f"[諧調揃えON] 基準min: {base}, 基準max: {base+ct_range}, 幅: {ct_range} | スライスmin: {arr_min}, max: {arr_max}, 幅: {arr_width} | 正規化後min: {arr_disp.min()}, max: {arr_disp.max()}")
+            arr = arr_disp_uint8
+        else:
+            arr_norm = (arr - arr_min) / (arr_width + 1e-8)
+            arr_uint8 = (arr_norm * 255.0).astype(np.uint8)
+            print(f"[諧調揃えOFF] スライスmin: {arr_min}, max: {arr_max}, 幅: {arr_width} | 正規化後min: {arr_norm.min()}, max: {arr_norm.max()}")
+            arr = arr_uint8
         img = Image.fromarray(arr)
         buf = io.BytesIO()
         img.save(buf, format='PNG')
@@ -884,7 +957,8 @@ class DicomWebApi:
         return b64
 
     def get_init_html(self):
-        b64list = [self.get_png_b64(images[0]) for images in self.images_list]
+        # b64list = [self.get_png_b64(images[0]) for images in self.images_list]
+        b64list = [self.get_png_b64(original_images[0]) for original_images in self.original_images_list]
         # 画像サイズ取得（最初の画像のshapeを使う）
         img_shapes = [images[0].shape if len(images) > 0 else (512, 512) for images in self.images_list]
         # フォルダ名を取得（現在表示中のフォルダ1の名前）
@@ -944,22 +1018,22 @@ class DicomWebApi:
     def get_slice(self, idx):
         idx = int(idx)
         b64list = []
-        for images in self.images_list:
-            if idx < len(images):
-                b64list.append(self.get_png_b64(images[idx]))
+        for original_images in self.original_images_list:
+            if idx < len(original_images):
+                b64list.append(self.get_png_b64(original_images[idx]))
             else:
-                arr = np.zeros_like(images[0])
+                arr = np.zeros_like(original_images[0])
                 b64list.append(self.get_png_b64(arr))
         return b64list
 
     def get_single_slice(self, series_idx, idx):
         series_idx = int(series_idx)
         idx = int(idx)
-        images = self.images_list[series_idx]
-        if idx < len(images):
-            return self.get_png_b64(images[idx])
+        original_images = self.original_images_list[series_idx]
+        if idx < len(original_images):
+            return self.get_png_b64(original_images[idx])
         else:
-            arr = np.zeros_like(images[0])
+            arr = np.zeros_like(original_images[0])
             return self.get_png_b64(arr)
 
     # Python側API: ROI統計計算
@@ -1020,19 +1094,18 @@ class DicomWebApi:
     def switch_folder(self, series_idx, folder_idx):
         series_idx = int(series_idx)
         folder_idx = int(folder_idx)
-        
         if series_idx < len(self.all_subfolders) and folder_idx < len(self.all_subfolders[series_idx]):
             new_folder = self.all_subfolders[series_idx][folder_idx]
             images, original_images, file_names = self.load_single_folder(new_folder)
-            
             self.images_list[series_idx] = images
             self.original_images_list[series_idx] = original_images
             self.file_names_list[series_idx] = file_names
             self.series_max_idx_list[series_idx] = len(images) - 1
-            
+            # フォルダ切替時も諧調揃えONなら全画像再描画のためTrueを返す
             return {
                 'success': True,
-                'max_idx': len(images) - 1
+                'max_idx': len(images) - 1,
+                'match_contrast_enabled': self.match_contrast_enabled
             }
         return {'success': False}
     
@@ -1057,6 +1130,11 @@ class DicomWebApi:
         if series_idx < len(self.folder_types):
             return self.folder_types[series_idx]
         return "folder1"
+
+    # JSから呼び出すAPI: 諧調揃え状態のON/OFF切替
+    def set_match_contrast_enabled(self, enabled):
+        self.match_contrast_enabled = bool(enabled)
+        return {'success': True, 'enabled': self.match_contrast_enabled}
 
     def export_history_to_excel(self, history_data):
         try:
