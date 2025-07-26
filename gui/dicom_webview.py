@@ -143,6 +143,8 @@ HTML_TEMPLATE = r'''
                     </div>
                     <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-eraser"></i> ROI削除</button>
                     <button id="match-contrast-btn" style="border: none; background: #ff9800; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">諧調揃え: OFF</button>
+                    <button id="download-display-btn" style="border: none; background: #2196F3; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存</button>
+                    <button id="download-display-roi-btn" style="border: none; background: #9C27B0; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存(ROI含む)</button>
                 </div>
                 <div class="toolbar-row2" style="display: flex; align-items: center; gap: 5px; width: 100%;">
                     <label class="toolbar-label-text">サイズ:</label>
@@ -515,7 +517,82 @@ HTML_TEMPLATE = r'''
         if (typeof redrawAllImages === 'function') {{
             redrawAllImages();
         }}
-    }});
+            }});
+
+        // 表示画像ダウンロード機能
+        const downloadDisplayBtn = document.getElementById('download-display-btn');
+        downloadDisplayBtn.addEventListener('click', async function() {{
+            console.log('[DEBUG] ダウンロードボタンがクリックされました');
+            try {{
+                console.log('[DEBUG] pywebview API確認:', !!window.pywebview, !!window.pywebview?.api, !!window.pywebview?.api?.get_display_images_for_download);
+                
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.get_display_images_for_download) {{
+                    console.log('[DEBUG] Python API呼び出し開始');
+                    const result = await window.pywebview.api.get_display_images_for_download();
+                    console.log('[DEBUG] Python API結果:', result);
+                    
+                    if (result.success) {{
+                        console.log('[DEBUG] ファイル保存成功:', result.file_path);
+                        alert('画像を保存しました: ' + result.filename + '\\n保存先: ' + result.file_path);
+                    }} else {{
+                        console.error('ダウンロードエラー:', result.error);
+                        alert('画像の保存に失敗しました: ' + result.error);
+                    }}
+                }} else {{
+                    console.error('[DEBUG] pywebview APIが見つかりません');
+                    alert('pywebview APIが見つかりません');
+                }}
+            }} catch (error) {{
+                console.error('ダウンロード処理エラー:', error);
+                alert('ダウンロード処理中にエラーが発生しました: ' + error.message);
+            }}
+        }});
+
+        // ROI含む表示画像ダウンロード機能
+        const downloadDisplayRoiBtn = document.getElementById('download-display-roi-btn');
+        downloadDisplayRoiBtn.addEventListener('click', async function() {{
+            console.log('[DEBUG] ROI含むダウンロードボタンがクリックされました');
+            try {{
+                console.log('[DEBUG] pywebview API確認:', !!window.pywebview, !!window.pywebview?.api, !!window.pywebview?.api?.get_display_images_with_roi_for_download);
+                
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.get_display_images_with_roi_for_download) {{
+                    console.log('[DEBUG] ROI座標を取得中...');
+                    
+                    // 現在のROI座標を取得
+                    const roiCoordsList = [];
+                    for (let i = 0; i < seriesCount; i++) {{
+                        if (roiCoords[i]) {{
+                            roiCoordsList.push({{
+                                x: roiCoords[i].x,
+                                y: roiCoords[i].y
+                            }});
+                        }} else {{
+                            roiCoordsList.push(null);
+                        }}
+                    }}
+                    
+                    console.log('[DEBUG] ROI座標リスト:', roiCoordsList);
+                    console.log('[DEBUG] Python API呼び出し開始');
+                    
+                    const result = await window.pywebview.api.get_display_images_with_roi_for_download(roiCoordsList);
+                    console.log('[DEBUG] Python API結果:', result);
+                    
+                    if (result.success) {{
+                        console.log('[DEBUG] ROI含むファイル保存成功:', result.file_path);
+                        alert('ROI含む画像を保存しました: ' + result.filename + '\\n保存先: ' + result.file_path);
+                    }} else {{
+                        console.error('ROI含むダウンロードエラー:', result.error);
+                        alert('ROI含む画像の保存に失敗しました: ' + result.error);
+                    }}
+                }} else {{
+                    console.error('[DEBUG] pywebview APIが見つかりません');
+                    alert('pywebview APIが見つかりません');
+                }}
+            }} catch (error) {{
+                console.error('ROI含むダウンロード処理エラー:', error);
+                alert('ROI含むダウンロード処理中にエラーが発生しました: ' + error.message);
+            }}
+        }});
 
     updateModeButtons();
 
@@ -980,6 +1057,267 @@ class DicomWebApi:
         b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
         return b64
 
+    def get_display_images_for_download(self):
+        """現在表示されている画素値（諧調調整済み）をPNGとして保存"""
+        try:
+            from PIL import Image
+            import io
+            import base64
+            import numpy as np
+            from datetime import datetime
+            import os
+            
+            print("[DEBUG] ダウンロード処理開始")
+            
+            # 現在表示されている画像のbase64データを取得
+            display_images = []
+            slice_names = []
+            
+            print(f"[DEBUG] original_images_listの長さ: {len(self.original_images_list)}")
+            
+            for i, original_images in enumerate(self.original_images_list):
+                print(f"[DEBUG] シリーズ {i} の処理開始")
+                
+                # 現在のスライスインデックスを取得（簡易的に0を使用）
+                current_slice_idx = 0
+                if hasattr(self, 'current_slices') and i < len(self.current_slices):
+                    current_slice_idx = self.current_slices[i]
+                
+                print(f"[DEBUG] 現在のスライスインデックス: {current_slice_idx}")
+                
+                # 生CT値を取得
+                arr = original_images[current_slice_idx]
+                print(f"[DEBUG] 配列の形状: {arr.shape}, 型: {arr.dtype}")
+                
+                # 諧調調整を適用して表示用画素値に変換
+                arr_min = float(np.min(arr))
+                arr_max = float(np.max(arr))
+                arr_width = arr_max - arr_min
+                
+                print(f"[DEBUG] CT値範囲: min={arr_min}, max={arr_max}, width={arr_width}")
+                
+                if getattr(self, 'match_contrast_enabled', False):
+                    base, ct_range = self.get_min_ct_window()
+                    arr_disp = np.clip((arr - base) / ct_range, 0, 1)
+                    arr_disp_uint8 = (arr_disp * 255.0).astype(np.uint8)
+                    print(f"[DEBUG] 諧調揃えON: base={base}, ct_range={ct_range}")
+                else:
+                    arr_norm = (arr - arr_min) / (arr_width + 1e-8)
+                    arr_disp_uint8 = (arr_norm * 255.0).astype(np.uint8)
+                    print(f"[DEBUG] 諧調揃えOFF")
+                
+                print(f"[DEBUG] 表示用画素値範囲: min={arr_disp_uint8.min()}, max={arr_disp_uint8.max()}")
+                
+                # PNGに変換
+                img = Image.fromarray(arr_disp_uint8)
+                display_images.append(img)
+                
+                # スライス名を生成
+                slice_name = f"series{i+1}_slice{current_slice_idx+1}"
+                slice_names.append(slice_name)
+                print(f"[DEBUG] スライス名: {slice_name}")
+            
+            print(f"[DEBUG] 表示画像数: {len(display_images)}")
+            
+            # 複数画像を横に並べて結合
+            if len(display_images) == 1:
+                combined_image = display_images[0]
+                print("[DEBUG] 単一画像のため結合なし")
+            else:
+                # 画像の高さを統一（最大の高さに合わせる）
+                max_height = max(img.height for img in display_images)
+                total_width = sum(img.width for img in display_images) + (len(display_images) - 1) * 10  # 10px間隔
+                
+                print(f"[DEBUG] 結合画像サイズ: {total_width}x{max_height}")
+                
+                # 新しい画像を作成
+                combined_image = Image.new('L', (total_width, max_height), 255)
+                
+                # 画像を横に並べて配置
+                x_offset = 0
+                for img in display_images:
+                    # 画像を中央揃えで配置
+                    y_offset = (max_height - img.height) // 2
+                    combined_image.paste(img, (x_offset, y_offset))
+                    x_offset += img.width + 10  # 10px間隔
+                
+                print("[DEBUG] 画像結合完了")
+            
+            # ファイル名を生成
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{'-'.join(slice_names)}-{timestamp}.png"
+            
+            # ダウンロードフォルダに保存
+            downloads_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
+            file_path = os.path.join(downloads_dir, filename)
+            
+            # PNGとして保存
+            combined_image.save(file_path, format='PNG')
+            
+            print(f"[DEBUG] ファイル保存完了: {file_path}")
+            
+            return {
+                'success': True,
+                'file_path': file_path,
+                'filename': filename
+            }
+            
+        except Exception as e:
+            print(f"[DEBUG] エラー発生: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    def get_display_images_with_roi_for_download(self, roi_coords_list):
+        """現在表示されている画素値（諧調調整済み）+ ROIをPNGとして保存"""
+        try:
+            from PIL import Image, ImageDraw
+            import io
+            import base64
+            import numpy as np
+            from datetime import datetime
+            import os
+            
+            print("[DEBUG] ROI含むダウンロード処理開始")
+            
+            # 現在表示されている画像のbase64データを取得
+            display_images = []
+            slice_names = []
+            
+            print(f"[DEBUG] original_images_listの長さ: {len(self.original_images_list)}")
+            print(f"[DEBUG] ROI座標リスト: {roi_coords_list}")
+            
+            for i, original_images in enumerate(self.original_images_list):
+                print(f"[DEBUG] シリーズ {i} の処理開始")
+                
+                # 現在のスライスインデックスを取得（簡易的に0を使用）
+                current_slice_idx = 0
+                if hasattr(self, 'current_slices') and i < len(self.current_slices):
+                    current_slice_idx = self.current_slices[i]
+                
+                print(f"[DEBUG] 現在のスライスインデックス: {current_slice_idx}")
+                
+                # 生CT値を取得
+                arr = original_images[current_slice_idx]
+                print(f"[DEBUG] 配列の形状: {arr.shape}, 型: {arr.dtype}")
+                
+                # 諧調調整を適用して表示用画素値に変換
+                arr_min = float(np.min(arr))
+                arr_max = float(np.max(arr))
+                arr_width = arr_max - arr_min
+                
+                print(f"[DEBUG] CT値範囲: min={arr_min}, max={arr_max}, width={arr_width}")
+                
+                if getattr(self, 'match_contrast_enabled', False):
+                    base, ct_range = self.get_min_ct_window()
+                    arr_disp = np.clip((arr - base) / ct_range, 0, 1)
+                    arr_disp_uint8 = (arr_disp * 255.0).astype(np.uint8)
+                    print(f"[DEBUG] 諧調揃えON: base={base}, ct_range={ct_range}")
+                else:
+                    arr_norm = (arr - arr_min) / (arr_width + 1e-8)
+                    arr_disp_uint8 = (arr_norm * 255.0).astype(np.uint8)
+                    print(f"[DEBUG] 諧調揃えOFF")
+                
+                print(f"[DEBUG] 表示用画素値範囲: min={arr_disp_uint8.min()}, max={arr_disp_uint8.max()}")
+                
+                # PNGに変換
+                img = Image.fromarray(arr_disp_uint8)
+                
+                # ROIを描画
+                if i < len(roi_coords_list) and roi_coords_list[i] is not None:
+                    roi_coords = roi_coords_list[i]
+                    print(f"[DEBUG] ROI座標: {roi_coords}")
+                    
+                    # ROIサイズを取得（デフォルト値）
+                    roi_width = 10
+                    roi_height = 10
+                    
+                    # グレースケール画像をRGBに変換（ROIを赤で描画するため）
+                    img_rgb = img.convert('RGB')
+                    
+                    # ROIを描画
+                    draw = ImageDraw.Draw(img_rgb)
+                    x = roi_coords['x']
+                    y = roi_coords['y']
+                    w = roi_width
+                    h = roi_height
+                    
+                    # 赤い枠線を描画
+                    draw.rectangle([x, y, x + w, y + h], outline=(255, 0, 0), width=2)
+                    print(f"[DEBUG] ROI描画完了: ({x}, {y}, {w}, {h})")
+                    
+                    # RGB画像をそのまま使用
+                    img = img_rgb
+                
+                display_images.append(img)
+                
+                # スライス名を生成
+                slice_name = f"series{i+1}_slice{current_slice_idx+1}"
+                slice_names.append(slice_name)
+                print(f"[DEBUG] スライス名: {slice_name}")
+            
+            print(f"[DEBUG] 表示画像数: {len(display_images)}")
+            
+            # 複数画像を横に並べて結合
+            if len(display_images) == 1:
+                combined_image = display_images[0]
+                print("[DEBUG] 単一画像のため結合なし")
+            else:
+                # 画像の高さを統一（最大の高さに合わせる）
+                max_height = max(img.height for img in display_images)
+                total_width = sum(img.width for img in display_images) + (len(display_images) - 1) * 10  # 10px間隔
+                
+                print(f"[DEBUG] 結合画像サイズ: {total_width}x{max_height}")
+                
+                # 新しい画像を作成（RGBまたはグレースケール）
+                # ROIがある場合はRGB、ない場合はグレースケール
+                has_roi = any(i < len(roi_coords_list) and roi_coords_list[i] is not None for i in range(len(display_images)))
+                if has_roi:
+                    combined_image = Image.new('RGB', (total_width, max_height), (255, 255, 255))
+                else:
+                    combined_image = Image.new('L', (total_width, max_height), 255)
+                
+                # 画像を横に並べて配置
+                x_offset = 0
+                for img in display_images:
+                    # 画像を中央揃えで配置
+                    y_offset = (max_height - img.height) // 2
+                    combined_image.paste(img, (x_offset, y_offset))
+                    x_offset += img.width + 10  # 10px間隔
+                
+                print("[DEBUG] 画像結合完了")
+            
+            # ファイル名を生成
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            filename = f"{'-'.join(slice_names)}-ROI-{timestamp}.png"
+            
+            # ダウンロードフォルダに保存
+            downloads_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
+            file_path = os.path.join(downloads_dir, filename)
+            
+            # PNGとして保存
+            combined_image.save(file_path, format='PNG')
+            
+            print(f"[DEBUG] ROI含むファイル保存完了: {file_path}")
+            
+            return {
+                'success': True,
+                'file_path': file_path,
+                'filename': filename
+            }
+            
+        except Exception as e:
+            print(f"[DEBUG] エラー発生: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
     def get_init_html(self):
         # b64list = [self.get_png_b64(images[0]) for images in self.images_list]
         b64list = [self.get_png_b64(original_images[0]) for original_images in self.original_images_list]
@@ -1232,4 +1570,4 @@ if __name__ == '__main__':
     api = DicomWebApi(folders)
     html = api.get_init_html()
     window = webview.create_window('DICOM Web Viewer (Multi-Series)', html=html, js_api=api, width=1200, height=900)
-    webview.start(debug=False)
+    webview.start(debug=True)
