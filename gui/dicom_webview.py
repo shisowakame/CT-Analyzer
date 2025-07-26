@@ -603,10 +603,6 @@ HTML_TEMPLATE = r'''
 
         const selector = document.getElementById('folder-selector-' + seriesIdx);
         if (selector.style.display === 'none') {{
-            for (let i = 0; i < seriesCount; i++) {{
-                const otherSelector = document.getElementById('folder-selector-' + i);
-                if (otherSelector) otherSelector.style.display = 'none';
-            }}
             const folderList = await window.pywebview.api.get_folder_list(seriesIdx);
             selector.innerHTML = '';
             folderList.forEach((folder, idx) => {{
@@ -617,9 +613,10 @@ HTML_TEMPLATE = r'''
                 div.style.borderBottom = '1px solid #eee';
                 div.onmouseover = function() {{ this.style.backgroundColor = '#f0f0f0'; }};
                 div.onmouseout = function() {{ this.style.backgroundColor = 'white'; }};
-                div.onclick = function() {{
+                div.onclick = function(e) {{
+                    e.stopPropagation(); // イベント伝播を停止
                     selectFolder(seriesIdx, idx);
-                    selector.style.display = 'block';
+                    selector.style.display = 'none';
                 }};
                 selector.appendChild(div);
             }});
@@ -664,9 +661,16 @@ HTML_TEMPLATE = r'''
     }}
 
     document.addEventListener('click', function(e) {{
-        if (!e.target.closest('.series-block')) {{
+        // フォルダ選択ボタンまたはフォルダ選択リストの外をクリックした場合
+        if (!e.target.closest('.series-block') || 
+            (e.target.closest('.series-block') && 
+             !e.target.closest('[onclick*="showFolderSelector"]') && 
+             !e.target.closest('[id*="folder-selector-"]'))) {{
             for (let i = 0; i < seriesCount; i++) {{
-                document.getElementById('folder-selector-' + i).style.display = 'none';
+                const selector = document.getElementById('folder-selector-' + i);
+                if (selector) {{
+                    selector.style.display = 'none';
+                }}
             }}
         }}
     }});
