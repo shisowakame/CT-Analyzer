@@ -478,12 +478,8 @@ HTML_TEMPLATE = r'''
         syncMode = newMode;
         updateModeButtons();
 
-        if (syncMode) {{
-            if (roiCoords[0]) {{
-                for (let i = 1; i < seriesCount; i++) roiCoords[i] = {{x: roiCoords[0].x, y: roiCoords[0].y}};
-                redrawAllROIs();
-            }}
-        }}
+        // 同期モードに変更した際は、自動的にROIを同期しない
+        // ユーザーが実際にROIをクリックした際に同期される
     }}
 
     document.getElementById('sync-mode-btn').addEventListener('click', function() {{
