@@ -300,13 +300,14 @@ HTML_TEMPLATE = r'''
     }}
 
     // 新しい情報ポップアップ表示関数
-    function showInfoPopup(infoText) {{
+    function showInfoPopup(infoText, event) {{
         const popup = document.createElement('div');
+        const rect = event.target.getBoundingClientRect();
         popup.style.cssText = `
             position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
+            top: ${{rect.top - 10}}px;
+            left: ${{rect.left}}px;
+            transform: translate(-100%, -100%);
             background: white;
             border: 2px solid #ccc;
             border-radius: 8px;
@@ -343,7 +344,7 @@ HTML_TEMPLATE = r'''
             button.onclick = function(e) {{
                 e.stopPropagation(); // 親要素へのイベント伝播を停止
                 const info = decodeURIComponent(this.dataset.info);
-                showInfoPopup(info);
+                showInfoPopup(info, e);
             }};
         }});
     }}
