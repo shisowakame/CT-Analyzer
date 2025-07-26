@@ -142,7 +142,11 @@ HTML_TEMPLATE = r'''
                         <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-unlink"></i> 独立</button>
                     </div>
                     <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-eraser"></i> ROI削除</button>
-                    <button id="match-contrast-btn" style="border: none; background: #ff9800; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">諧調揃え: OFF</button>
+                    <span style="margin-left: 8px; font-size: 12px; color: #333;">諧調揃え:</span>
+                    <div style="display: flex; align-items: center; background: #e0e0e0; border-radius: 20px; padding: 2px; margin-left: 4px;">
+                        <button id="match-contrast-on-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">ON</button>
+                        <button id="match-contrast-off-btn" style="border: none; background: #ff9800; color: white; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">OFF</button>
+                    </div>
                     <button id="download-display-btn" style="border: none; background: #2196F3; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存</button>
                     <button id="download-display-roi-btn" style="border: none; background: #9C27B0; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存(ROI含む)</button>
                 </div>
@@ -502,19 +506,55 @@ HTML_TEMPLATE = r'''
 
     // 諧調揃えボタン状態
     let matchContrastEnabled = false;
-    const matchContrastBtn = document.getElementById('match-contrast-btn');
-    matchContrastBtn.addEventListener('click', async function() {{
-        matchContrastEnabled = !matchContrastEnabled;
-        matchContrastBtn.textContent = '諧調揃え: ' + (matchContrastEnabled ? 'ON' : 'OFF');
-        // Python側API呼び出し（プレースホルダ）
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_match_contrast_enabled) {{
-            await window.pywebview.api.set_match_contrast_enabled(matchContrastEnabled);
+    const matchContrastOnBtn = document.getElementById('match-contrast-on-btn');
+    const matchContrastOffBtn = document.getElementById('match-contrast-off-btn');
+    
+    // ONボタンのイベントリスナー
+    matchContrastOnBtn.addEventListener('click', async function() {{
+        if (!matchContrastEnabled) {{
+            matchContrastEnabled = true;
+            updateMatchContrastButtons();
+            // Python側API呼び出し
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_match_contrast_enabled) {{
+                await window.pywebview.api.set_match_contrast_enabled(matchContrastEnabled);
+            }}
+            // 画像再描画
+            if (typeof redrawAllImages === 'function') {{
+                redrawAllImages();
+            }}
         }}
-        // 画像再描画（プレースホルダ）
-        if (typeof redrawAllImages === 'function') {{
-            redrawAllImages();
+    }});
+    
+    // OFFボタンのイベントリスナー
+    matchContrastOffBtn.addEventListener('click', async function() {{
+        if (matchContrastEnabled) {{
+            matchContrastEnabled = false;
+            updateMatchContrastButtons();
+            // Python側API呼び出し
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_match_contrast_enabled) {{
+                await window.pywebview.api.set_match_contrast_enabled(matchContrastEnabled);
+            }}
+            // 画像再描画
+            if (typeof redrawAllImages === 'function') {{
+                redrawAllImages();
+            }}
         }}
-            }});
+    }});
+    
+    // ボタン状態更新関数
+    function updateMatchContrastButtons() {{
+        if (matchContrastEnabled) {{
+            matchContrastOnBtn.style.background = '#ff9800';
+            matchContrastOnBtn.style.color = 'white';
+            matchContrastOffBtn.style.background = 'transparent';
+            matchContrastOffBtn.style.color = '#666';
+        }} else {{
+            matchContrastOnBtn.style.background = 'transparent';
+            matchContrastOnBtn.style.color = '#666';
+            matchContrastOffBtn.style.background = '#ff9800';
+            matchContrastOffBtn.style.color = 'white';
+        }}
+    }}
 
         // 表示画像ダウンロード機能
         const downloadDisplayBtn = document.getElementById('download-display-btn');
