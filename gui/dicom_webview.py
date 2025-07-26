@@ -99,6 +99,35 @@ HTML_TEMPLATE = r'''
         /* ボタン共通 */
         button {{ transition: box-shadow 0.2s, background 0.2s; }}
         button:active {{ box-shadow: 0 2px 8px rgba(33,150,243,0.12) inset; }}
+        /* ROIサイズボックスのスピンボタン非表示 */
+        #roi-width, #roi-height {{
+            /* スピンボタンのみ非表示、枠線や背景色は元のまま */
+        }}
+        #roi-width::-webkit-outer-spin-button, #roi-width::-webkit-inner-spin-button,
+        #roi-height::-webkit-outer-spin-button, #roi-height::-webkit-inner-spin-button {{
+            -webkit-appearance: none;
+            margin: 0;
+        }}
+        #roi-width::-moz-inner-spin-button, #roi-height::-moz-inner-spin-button {{
+            -moz-appearance: none;
+        }}
+        /* ROIサイズボックスとROI座標入力ボックスの中央揃え */
+        #roi-width, #roi-height, input[id^="roi-x-"], input[id^="roi-y-"] {{
+            text-align: center;
+        }}
+        .preset {{
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 4px 8px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-left: 1px;
+        }}
+        .preset:hover {{
+            background: #555;
+        }}
     </style>
 </head>
 <body>
@@ -106,29 +135,24 @@ HTML_TEMPLATE = r'''
         <div class="left-panel">
             <h2>DICOM Web Viewer (Multi-Series)<i class="fa-solid fa-x-ray"></i> </h2>
             <div id="toolbar" style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px;">
-                <div class="toolbar-row1" style="display: flex; flex-direction: row; align-items: center; gap: 0; width: 100%;">
-                    <div class="toolbar-label" style="min-width: 90px; display: flex; align-items: center;">
-                        <label class="toolbar-label-text"><i class="fa-solid fa-layer-group"></i> モード:</label>
+                <div class="toolbar-row1" style="display: flex; align-items: center; gap: 2px; width: 100%;">
+                    <label class="toolbar-label-text">モード:</label>
+                    <div style="display: flex; align-items: center; background: #e0e0e0; border-radius: 20px; padding: 2px; position: relative;">
+                        <button id="sync-mode-btn" style="border: none; background: #4CAF50; color: white; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-link"></i> 同期</button>
+                        <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-unlink"></i> 独立</button>
                     </div>
-                    <div class="toolbar-controls" style="display: flex; align-items: center; gap: 10px;">
-                        <div style="display: flex; align-items: center; background: #e0e0e0; border-radius: 20px; padding: 2px; position: relative;">
-                            <button id="sync-mode-btn" style="border: none; background: #4CAF50; color: white; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-link"></i> 同期</button>
-                            <button id="indep-mode-btn" style="border: none; background: transparent; color: #666; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;"><i class="fa-solid fa-unlink"></i> 独立</button>
-                        </div>
-                        <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-eraser"></i> リセット</button>
-                        <!-- 諧調揃えボタン追加（ここから） -->
-                        <button id="match-contrast-btn" style="border: none; background: #ff9800; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">諧調揃え: OFF</button>
-                        <!-- 諧調揃えボタン追加（ここまで） -->
-                    </div>
+                    <button id="reset-roi-btn" style="border: none; background: #f44336; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-eraser"></i> ROI削除</button>
+                    <button id="match-contrast-btn" style="border: none; background: #ff9800; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;">諧調揃え: OFF</button>
                 </div>
-                <div class="toolbar-row2" style="display: flex; flex-direction: row; align-items: center; gap: 0; width: 100%;">
-                    <div class="toolbar-label" style="min-width: 90px; display: flex; align-items: center;">
-                        <label class="toolbar-label-text"><i class="fa-solid fa-expand-arrows-alt"></i> サイズ:</label>
+                <div class="toolbar-row2" style="display: flex; align-items: center; gap: 5px; width: 100%;">
+                    <label class="toolbar-label-text">サイズ:</label>
+                    <div style="display: flex; align-items: center; gap: 2px;">
+                        <input type="number" id="roi-width" min="3" max="200" value="10" style="width: 30px;">
+                        <span>×</span>
+                        <input type="number" id="roi-height" min="3" max="200" value="10" style="width: 30px;">
                     </div>
-                    <div class="toolbar-controls" style="display: flex; align-items: center; gap: 10px;">
-                        <input type="number" id="roi-width" min="3" max="200" value="10"> ×
-                        <input type="number" id="roi-height" min="3" max="200" value="10">
-                        <span><i class="fa-solid fa-bolt"></i> プリセット:</span>
+                    <span> プリセット:</span>
+                    <div style="display: flex; align-items: center; gap: 2px;">
                         <button class="preset" data-w="5" data-h="5">5×5</button>
                         <button class="preset" data-w="10" data-h="10">10×10</button>
                         <button class="preset" data-w="20" data-h="20">20×20</button>
