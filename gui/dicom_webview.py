@@ -573,7 +573,8 @@ HTML_TEMPLATE = r'''
                 
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.get_display_images_for_download) {{
                     console.log('[DEBUG] Python API呼び出し開始');
-                    const result = await window.pywebview.api.get_display_images_for_download();
+                    console.log('[DEBUG] 現在のスライスインデックス:', currentSlices);
+                    const result = await window.pywebview.api.get_display_images_for_download(currentSlices);
                     console.log('[DEBUG] Python API結果:', result);
                     
                     if (result.success) {{
@@ -603,14 +604,16 @@ HTML_TEMPLATE = r'''
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.get_display_images_with_roi_for_download) {{
                     console.log('[DEBUG] ROI座標を取得中...');
                     
-                    // 現在のROI座標と色を取得
+                    // 現在のROI座標、色、サイズを取得
                     const roiCoordsList = [];
                     for (let i = 0; i < seriesCount; i++) {{
                         if (roiCoords[i]) {{
                             roiCoordsList.push({{
                                 x: roiCoords[i].x,
                                 y: roiCoords[i].y,
-                                color: roiColor
+                                color: roiColor,
+                                width: roiW,
+                                height: roiH
                             }});
                         }} else {{
                             roiCoordsList.push(null);
@@ -618,9 +621,10 @@ HTML_TEMPLATE = r'''
                     }}
                     
                     console.log('[DEBUG] ROI座標リスト:', roiCoordsList);
+                    console.log('[DEBUG] 現在のスライスインデックス:', currentSlices);
                     console.log('[DEBUG] Python API呼び出し開始');
                     
-                    const result = await window.pywebview.api.get_display_images_with_roi_for_download(roiCoordsList);
+                    const result = await window.pywebview.api.get_display_images_with_roi_for_download(roiCoordsList, currentSlices);
                     console.log('[DEBUG] Python API結果:', result);
                     
                     if (result.success) {{
@@ -1118,7 +1122,7 @@ class DicomWebApi:
         b64 = base64.b64encode(buf.getvalue()).decode('utf-8')
         return b64
 
-    def get_display_images_for_download(self):
+    def get_display_images_for_download(self, current_slices):
         """現在表示されている画素値（諧調調整済み）をPNGとして保存"""
         try:
             from PIL import Image
@@ -1135,14 +1139,13 @@ class DicomWebApi:
             slice_names = []
             
             print(f"[DEBUG] original_images_listの長さ: {len(self.original_images_list)}")
+            print(f"[DEBUG] 受け取ったcurrent_slices: {current_slices}")
             
             for i, original_images in enumerate(self.original_images_list):
                 print(f"[DEBUG] シリーズ {i} の処理開始")
                 
-                # 現在のスライスインデックスを取得（簡易的に0を使用）
-                current_slice_idx = 0
-                if hasattr(self, 'current_slices') and i < len(self.current_slices):
-                    current_slice_idx = self.current_slices[i]
+                # 現在のスライスインデックスを取得
+                current_slice_idx = current_slices[i] if i < len(current_slices) else 0
                 
                 print(f"[DEBUG] 現在のスライスインデックス: {current_slice_idx}")
                 
@@ -1232,7 +1235,7 @@ class DicomWebApi:
                 'error': str(e)
             }
 
-    def get_display_images_with_roi_for_download(self, roi_coords_list):
+    def get_display_images_with_roi_for_download(self, roi_coords_list, current_slices):
         """現在表示されている画素値（諧調調整済み）+ ROIをPNGとして保存"""
         try:
             from PIL import Image, ImageDraw
@@ -1250,14 +1253,13 @@ class DicomWebApi:
             
             print(f"[DEBUG] original_images_listの長さ: {len(self.original_images_list)}")
             print(f"[DEBUG] ROI座標リスト: {roi_coords_list}")
+            print(f"[DEBUG] 受け取ったcurrent_slices: {current_slices}")
             
             for i, original_images in enumerate(self.original_images_list):
                 print(f"[DEBUG] シリーズ {i} の処理開始")
                 
-                # 現在のスライスインデックスを取得（簡易的に0を使用）
-                current_slice_idx = 0
-                if hasattr(self, 'current_slices') and i < len(self.current_slices):
-                    current_slice_idx = self.current_slices[i]
+                # 現在のスライスインデックスを取得
+                current_slice_idx = current_slices[i] if i < len(current_slices) else 0
                 
                 print(f"[DEBUG] 現在のスライスインデックス: {current_slice_idx}")
                 
@@ -1292,9 +1294,9 @@ class DicomWebApi:
                     roi_coords = roi_coords_list[i]
                     print(f"[DEBUG] ROI座標: {roi_coords}")
                     
-                    # ROIサイズを取得（デフォルト値）
-                    roi_width = 10
-                    roi_height = 10
+                    # ROIサイズを取得（JavaScriptから送信された値を使用）
+                    roi_width = roi_coords.get('width', 10)
+                    roi_height = roi_coords.get('height', 10)
                     
                     # グレースケール画像をRGBに変換（ROIを色付きで描画するため）
                     img_rgb = img.convert('RGB')
