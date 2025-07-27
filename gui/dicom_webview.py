@@ -166,7 +166,7 @@ HTML_TEMPLATE = r'''
                         <button class="preset" data-w="50" data-h="50">50×50</button>
                     </div>
                     <span style="margin-left: 8px;">ROI色:</span>
-                    <button id="roi-color-btn" style="border: 2px solid #ccc; background: #ff0000; width: 30px; height: 25px; border-radius: 4px; cursor: pointer; margin-left: 4px;" title="ROI色を変更"></button>
+                    <input type="color" id="roi-color-picker" value="#ff0000" style="width: 40px; height: 30px; border: 2px solid #ccc; border-radius: 4px; cursor: pointer; margin-left: 4px;" title="ROI色を変更">
                 </div>
             </div>
             <div id="grid">
@@ -196,34 +196,7 @@ HTML_TEMPLATE = r'''
         </div>
     </div>
     
-    <!-- ROI色選択カラーパレット -->
-    <div id="roi-color-palette" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 2px solid #ccc; border-radius: 8px; padding: 15px; z-index: 1000; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h3 style="margin: 0; font-size: 14px;">ROI色を選択</h3>
-            <button onclick="document.getElementById('roi-color-palette').style.display='none'" style="background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">×</button>
-        </div>
-        <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-bottom: 10px;">
-            <div class="color-option" data-color="#ff0000" style="width: 25px; height: 25px; background: #ff0000; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#00ff00" style="width: 25px; height: 25px; background: #00ff00; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#0000ff" style="width: 25px; height: 25px; background: #0000ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#ffff00" style="width: 25px; height: 25px; background: #ffff00; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#ff00ff" style="width: 25px; height: 25px; background: #ff00ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#00ffff" style="width: 25px; height: 25px; background: #00ffff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#ff8800" style="width: 25px; height: 25px; background: #ff8800; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#8800ff" style="width: 25px; height: 25px; background: #8800ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#ffffff" style="width: 25px; height: 25px; background: #ffffff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#000000" style="width: 25px; height: 25px; background: #000000; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#888888" style="width: 25px; height: 25px; background: #888888; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#ff0088" style="width: 25px; height: 25px; background: #ff0088; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#0088ff" style="width: 25px; height: 25px; background: #0088ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#88ff00" style="width: 25px; height: 25px; background: #88ff00; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#ff6600" style="width: 25px; height: 25px; background: #ff6600; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-            <div class="color-option" data-color="#880088" style="width: 25px; height: 25px; background: #880088; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
-        </div>
-        <div style="text-align: center;">
-            <button onclick="document.getElementById('roi-color-palette').style.display='none'" style="background: #4CAF50; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px;">閉じる</button>
-        </div>
-    </div>
+
     
     <script>
     const seriesCount = {series_count};
@@ -670,31 +643,14 @@ HTML_TEMPLATE = r'''
     updateModeButtons();
 
     // ROI色変更機能
-    const roiColorBtn = document.getElementById('roi-color-btn');
-    const roiColorPalette = document.getElementById('roi-color-palette');
+    const roiColorPicker = document.getElementById('roi-color-picker');
     
-    // ROI色変更ボタンのクリックイベント
-    roiColorBtn.addEventListener('click', function() {{
-        roiColorPalette.style.display = 'block';
-    }});
-    
-    // カラーパレットの色選択イベント
-    document.querySelectorAll('.color-option').forEach(option => {{
-        option.addEventListener('click', function() {{
-            roiColor = this.dataset.color;
-            roiColorBtn.style.background = roiColor;
-            roiColorPalette.style.display = 'none';
-            
-            // 既存のROIを新しい色で再描画
-            redrawAllROIs();
-        }});
-    }});
-    
-    // カラーパレット外クリックで閉じる
-    document.addEventListener('click', function(e) {{
-        if (!roiColorPalette.contains(e.target) && !roiColorBtn.contains(e.target)) {{
-            roiColorPalette.style.display = 'none';
-        }}
+    // ROI色変更のイベントリスナー
+    roiColorPicker.addEventListener('change', function() {{
+        roiColor = this.value;
+        
+        // 既存のROIを新しい色で再描画
+        redrawAllROIs();
     }});
 
     // フォルダ選択機能
