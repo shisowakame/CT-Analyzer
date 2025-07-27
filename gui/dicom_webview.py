@@ -148,7 +148,8 @@ HTML_TEMPLATE = r'''
                         <button id="match-contrast-off-btn" style="border: none; background: #ff9800; color: white; padding: 6px 12px; border-radius: 18px; cursor: pointer; font-size: 12px; transition: all 0.3s;">OFF</button>
                     </div>
                     <button id="download-display-btn" style="border: none; background: #2196F3; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存</button>
-                    <button id="download-display-roi-btn" style="border: none; background: #9C27B0; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存(ROI含む)</button>
+                    <button id="download-display-roi-btn" style="border: none; background: #2196F3; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存(ROI含む)</button>
+                    <!-- <button id="download-display-roi-btn" style="border: none; background: #9C27B0; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; margin-left: 8px;"><i class="fa-solid fa-download"></i> 表示画像保存(ROI含む)</button> -->
                 </div>
                 <div class="toolbar-row2" style="display: flex; align-items: center; gap: 5px; width: 100%;">
                     <label class="toolbar-label-text">サイズ:</label>
@@ -164,6 +165,8 @@ HTML_TEMPLATE = r'''
                         <button class="preset" data-w="20" data-h="20">20×20</button>
                         <button class="preset" data-w="50" data-h="50">50×50</button>
                     </div>
+                    <span style="margin-left: 8px;">ROI色:</span>
+                    <button id="roi-color-btn" style="border: 2px solid #ccc; background: #ff0000; width: 30px; height: 25px; border-radius: 4px; cursor: pointer; margin-left: 4px;" title="ROI色を変更"></button>
                 </div>
             </div>
             <div id="grid">
@@ -193,6 +196,35 @@ HTML_TEMPLATE = r'''
         </div>
     </div>
     
+    <!-- ROI色選択カラーパレット -->
+    <div id="roi-color-palette" style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; border: 2px solid #ccc; border-radius: 8px; padding: 15px; z-index: 1000; display: none; box-shadow: 0 4px 20px rgba(0,0,0,0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0; font-size: 14px;">ROI色を選択</h3>
+            <button onclick="document.getElementById('roi-color-palette').style.display='none'" style="background: #f44336; color: white; border: none; border-radius: 4px; padding: 4px 8px; cursor: pointer; font-size: 12px;">×</button>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-bottom: 10px;">
+            <div class="color-option" data-color="#ff0000" style="width: 25px; height: 25px; background: #ff0000; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#00ff00" style="width: 25px; height: 25px; background: #00ff00; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#0000ff" style="width: 25px; height: 25px; background: #0000ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#ffff00" style="width: 25px; height: 25px; background: #ffff00; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#ff00ff" style="width: 25px; height: 25px; background: #ff00ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#00ffff" style="width: 25px; height: 25px; background: #00ffff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#ff8800" style="width: 25px; height: 25px; background: #ff8800; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#8800ff" style="width: 25px; height: 25px; background: #8800ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#ffffff" style="width: 25px; height: 25px; background: #ffffff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#000000" style="width: 25px; height: 25px; background: #000000; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#888888" style="width: 25px; height: 25px; background: #888888; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#ff0088" style="width: 25px; height: 25px; background: #ff0088; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#0088ff" style="width: 25px; height: 25px; background: #0088ff; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#88ff00" style="width: 25px; height: 25px; background: #88ff00; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#ff6600" style="width: 25px; height: 25px; background: #ff6600; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+            <div class="color-option" data-color="#880088" style="width: 25px; height: 25px; background: #880088; border: 2px solid #ccc; border-radius: 4px; cursor: pointer;"></div>
+        </div>
+        <div style="text-align: center;">
+            <button onclick="document.getElementById('roi-color-palette').style.display='none'" style="background: #4CAF50; color: white; border: none; border-radius: 4px; padding: 6px 12px; cursor: pointer; font-size: 12px;">閉じる</button>
+        </div>
+    </div>
+    
     <script>
     const seriesCount = {series_count};
     const seriesMaxIdxList = {series_max_idx_list};
@@ -207,6 +239,9 @@ HTML_TEMPLATE = r'''
     const saveBtn = document.getElementById('save-btn');
     const resetBtn = document.getElementById('reset-btn');
     const exportExcelBtn = document.getElementById('export-excel-btn');
+    
+    // ROI色管理
+    let roiColor = '#ff0000'; // デフォルトは赤
 
     for (let i = 0; i < seriesCount; i++) {{
         imgs.push(document.getElementById('dicom-img-' + i));
@@ -595,13 +630,14 @@ HTML_TEMPLATE = r'''
                 if (window.pywebview && window.pywebview.api && window.pywebview.api.get_display_images_with_roi_for_download) {{
                     console.log('[DEBUG] ROI座標を取得中...');
                     
-                    // 現在のROI座標を取得
+                    // 現在のROI座標と色を取得
                     const roiCoordsList = [];
                     for (let i = 0; i < seriesCount; i++) {{
                         if (roiCoords[i]) {{
                             roiCoordsList.push({{
                                 x: roiCoords[i].x,
-                                y: roiCoords[i].y
+                                y: roiCoords[i].y,
+                                color: roiColor
                             }});
                         }} else {{
                             roiCoordsList.push(null);
@@ -632,6 +668,34 @@ HTML_TEMPLATE = r'''
         }});
 
     updateModeButtons();
+
+    // ROI色変更機能
+    const roiColorBtn = document.getElementById('roi-color-btn');
+    const roiColorPalette = document.getElementById('roi-color-palette');
+    
+    // ROI色変更ボタンのクリックイベント
+    roiColorBtn.addEventListener('click', function() {{
+        roiColorPalette.style.display = 'block';
+    }});
+    
+    // カラーパレットの色選択イベント
+    document.querySelectorAll('.color-option').forEach(option => {{
+        option.addEventListener('click', function() {{
+            roiColor = this.dataset.color;
+            roiColorBtn.style.background = roiColor;
+            roiColorPalette.style.display = 'none';
+            
+            // 既存のROIを新しい色で再描画
+            redrawAllROIs();
+        }});
+    }});
+    
+    // カラーパレット外クリックで閉じる
+    document.addEventListener('click', function(e) {{
+        if (!roiColorPalette.contains(e.target) && !roiColorBtn.contains(e.target)) {{
+            roiColorPalette.style.display = 'none';
+        }}
+    }});
 
     // フォルダ選択機能
     async function showFolderSelector(seriesIdx) {{
@@ -730,13 +794,13 @@ HTML_TEMPLATE = r'''
         const y = roiCoords[idx].y * scaleY;
         const w = roiW * scaleX;
         const h = roiH * scaleY;
-        ctx.strokeStyle = 'red';
+        ctx.strokeStyle = roiColor;
         ctx.lineWidth = 2;
         ctx.setLineDash([4,2]);
         ctx.globalAlpha = 0.7;
         ctx.strokeRect(x, y, w, h);
         ctx.globalAlpha = 0.2;
-        ctx.fillStyle = 'red';
+        ctx.fillStyle = roiColor;
         ctx.fillRect(x, y, w, h);
         ctx.globalAlpha = 1.0;
     }}
@@ -1276,7 +1340,7 @@ class DicomWebApi:
                     roi_width = 10
                     roi_height = 10
                     
-                    # グレースケール画像をRGBに変換（ROIを赤で描画するため）
+                    # グレースケール画像をRGBに変換（ROIを色付きで描画するため）
                     img_rgb = img.convert('RGB')
                     
                     # ROIを描画
@@ -1286,9 +1350,22 @@ class DicomWebApi:
                     w = roi_width
                     h = roi_height
                     
-                    # 赤い枠線を描画
-                    draw.rectangle([x, y, x + w, y + h], outline=(255, 0, 0), width=2)
-                    print(f"[DEBUG] ROI描画完了: ({x}, {y}, {w}, {h})")
+                    # 色を取得（デフォルトは赤）
+                    roi_color = roi_coords.get('color', '#ff0000')
+                    
+                    # 16進数カラーコードをRGBタプルに変換
+                    if roi_color.startswith('#'):
+                        roi_color = roi_color[1:]  # #を除去
+                        r = int(roi_color[0:2], 16)
+                        g = int(roi_color[2:4], 16)
+                        b = int(roi_color[4:6], 16)
+                        color_tuple = (r, g, b)
+                    else:
+                        color_tuple = (255, 0, 0)  # デフォルトは赤
+                    
+                    # 指定された色で枠線を描画
+                    draw.rectangle([x, y, x + w, y + h], outline=color_tuple, width=2)
+                    print(f"[DEBUG] ROI描画完了: ({x}, {y}, {w}, {h}), 色: {color_tuple}")
                     
                     # RGB画像をそのまま使用
                     img = img_rgb
@@ -1611,4 +1688,4 @@ if __name__ == '__main__':
     api = DicomWebApi(folders)
     html = api.get_init_html()
     window = webview.create_window('DICOM Web Viewer (Multi-Series)', html=html, js_api=api, width=1200, height=900)
-    webview.start(debug=True)
+    webview.start(debug=False)
