@@ -579,7 +579,16 @@ HTML_TEMPLATE = r'''
                     
                     if (result.success) {{
                         console.log('[DEBUG] ファイル保存成功:', result.file_path);
-                        alert('画像を保存しました: ' + result.filename + '\\n保存先: ' + result.file_path);
+                        let message = '画像を保存しました:\\n';
+                        message += '結合画像: ' + result.filename + '\\n';
+                        if (result.individual_files && result.individual_files.length > 0) {{
+                            message += '個別画像:\\n';
+                            result.individual_files.forEach(filename => {{
+                                message += '  - ' + filename + '\\n';
+                            }});
+                        }}
+                        message += '保存先: ' + result.file_path.replace(/\\/g, '/').split('/').slice(-2).join('/');
+                        alert(message);
                     }} else {{
                         console.error('ダウンロードエラー:', result.error);
                         alert('画像の保存に失敗しました: ' + result.error);
@@ -629,7 +638,16 @@ HTML_TEMPLATE = r'''
                     
                     if (result.success) {{
                         console.log('[DEBUG] ROI含むファイル保存成功:', result.file_path);
-                        alert('ROI含む画像を保存しました: ' + result.filename + '\\n保存先: ' + result.file_path);
+                        let message = 'ROI含む画像を保存しました:\\n';
+                        message += '結合画像: ' + result.filename + '\\n';
+                        if (result.individual_files && result.individual_files.length > 0) {{
+                            message += '個別画像:\\n';
+                            result.individual_files.forEach(filename => {{
+                                message += '  - ' + filename + '\\n';
+                            }});
+                        }}
+                        message += '保存先: ' + result.file_path.replace(/\\/g, '/').split('/').slice(-2).join('/');
+                        alert(message);
                     }} else {{
                         console.error('ROI含むダウンロードエラー:', result.error);
                         alert('ROI含む画像の保存に失敗しました: ' + result.error);
@@ -1207,23 +1225,32 @@ class DicomWebApi:
                 
                 print("[DEBUG] 画像結合完了")
             
-            # ファイル名を生成
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{'-'.join(slice_names)}-{timestamp}.png"
-            
-            # ダウンロードフォルダに保存
+            # 個々の画像を保存
+            individual_files = []
             downloads_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
-            file_path = os.path.join(downloads_dir, filename)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            # PNGとして保存
-            combined_image.save(file_path, format='PNG')
+            for i, img in enumerate(display_images):
+                individual_filename = f"{slice_names[i]}-{timestamp}.png"
+                individual_file_path = os.path.join(downloads_dir, individual_filename)
+                img.save(individual_file_path, format='PNG')
+                individual_files.append(individual_filename)
+                print(f"[DEBUG] 個別画像保存完了: {individual_file_path}")
             
-            print(f"[DEBUG] ファイル保存完了: {file_path}")
+            # 結合画像のファイル名を生成
+            combined_filename = f"{'-'.join(slice_names)}-{timestamp}.png"
+            combined_file_path = os.path.join(downloads_dir, combined_filename)
+            
+            # 結合画像をPNGとして保存
+            combined_image.save(combined_file_path, format='PNG')
+            
+            print(f"[DEBUG] 結合画像保存完了: {combined_file_path}")
             
             return {
                 'success': True,
-                'file_path': file_path,
-                'filename': filename
+                'file_path': combined_file_path,
+                'filename': combined_filename,
+                'individual_files': individual_files
             }
             
         except Exception as e:
@@ -1366,23 +1393,32 @@ class DicomWebApi:
                 
                 print("[DEBUG] 画像結合完了")
             
-            # ファイル名を生成
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = f"{'-'.join(slice_names)}-ROI-{timestamp}.png"
-            
-            # ダウンロードフォルダに保存
+            # 個々の画像を保存
+            individual_files = []
             downloads_dir = os.path.join(os.path.expanduser('~'), 'Downloads')
-            file_path = os.path.join(downloads_dir, filename)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            # PNGとして保存
-            combined_image.save(file_path, format='PNG')
+            for i, img in enumerate(display_images):
+                individual_filename = f"{slice_names[i]}-ROI-{timestamp}.png"
+                individual_file_path = os.path.join(downloads_dir, individual_filename)
+                img.save(individual_file_path, format='PNG')
+                individual_files.append(individual_filename)
+                print(f"[DEBUG] ROI含む個別画像保存完了: {individual_file_path}")
             
-            print(f"[DEBUG] ROI含むファイル保存完了: {file_path}")
+            # 結合画像のファイル名を生成
+            combined_filename = f"{'-'.join(slice_names)}-ROI-{timestamp}.png"
+            combined_file_path = os.path.join(downloads_dir, combined_filename)
+            
+            # 結合画像をPNGとして保存
+            combined_image.save(combined_file_path, format='PNG')
+            
+            print(f"[DEBUG] ROI含む結合画像保存完了: {combined_file_path}")
             
             return {
                 'success': True,
-                'file_path': file_path,
-                'filename': filename
+                'file_path': combined_file_path,
+                'filename': combined_filename,
+                'individual_files': individual_files
             }
             
         except Exception as e:
