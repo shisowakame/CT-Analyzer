@@ -1,5 +1,9 @@
 # CT-Analyzer: DICOM画像解析ツール
 
+
+https://github.com/user-attachments/assets/f2e86ad7-f83e-4dfc-9617-2c809aabe625
+
+
 ## 概要
 
 CT-Analyzerは、複数のDICOM画像シリーズを同時に読み込み、ROI（Region of Interest）解析を行う医療画像解析ツールです。Webベースのインターフェースで、直感的な操作が可能です。
