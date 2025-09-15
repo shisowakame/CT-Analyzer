@@ -39,7 +39,7 @@ pip install -r requirements.txt
 
 3. アプリケーションを起動
 ```bash
-python gui/dicom_webview.py <folder1> [<folder2> ...]
+python main.py <folder1> [<folder2> ...]
 ```
 
 ## 使用方法
