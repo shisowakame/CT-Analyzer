@@ -47,8 +47,8 @@ python main.py <folder1> [<folder2> ...]
 ### 基本的な操作
 
 1. **DICOMフォルダの指定**
-   - 単一フォルダ: `python gui/dicom_webview.py /path/to/folder1`
-   - 複数フォルダ: `python gui/dicom_webview.py /path/to/folder1 /path/to/folder2`
+   - 単一フォルダ: `main.py /path/to/folder1`
+   - 複数フォルダ: `main.py /path/to/folder1 /path/to/folder2`
 
 2. **フォルダ構造**
    - **folder1**: 単一のDICOMフォルダ
